@@ -1,126 +1,98 @@
 # NanUI
 
-[[中文](./README.md)] | [English]
+[中文](README.md) | English
 
+**More**
 
+https://github.com/NetDimension/NanUI/
 
-## Introduction
+https://gitee.com/linxuanchen/NanUI/
 
-![screenshot](./screenshot.png)
+https://www.formium.net/
 
+---
 
-### NanUI Project
+## What's this
 
-**NanUI** is an open source .NET project for .NET / .NET Core developers who want to use front-end technologies such as HTML5 / CSS3 to build user interfaces for Windows Form applications. It's based on [ChromiumFX](https://bitbucket.org/chromiumfx/chromiumfx) project that is a .NET bindings for the Chromium Embedded Framework.
+NanUI is an open source .NET/.NET Core component for Windows Form Applications. It's suitable for .NET/.NET Core developers who wants to use front-end technologies suc as HTMM5/CSS3/JavaScript to design the user interface of Windows Form Applications.
 
-### Formium Engine
+WinFormium, the rendering engine of NanUI is based on Chromium Embedded Framework, so you can use various front-end technologies (HTML5/CSS3/JavaScript) and frameworks (React/Vue/Angular/Blazor) to design and develop user interface of .NET desktop applications.
 
-**Formium** is the core of the NanUI project. It is focused on using the web front-end technologies such as HTML5 / CSS3 / Javascript to build the user interface of desktop applications. It will bring unlimited possibilities to software interface design work.
+And WinFormium's JavaScript Bridge can easily and concisely relize the communication and data exchanges between the browser and .NET enviroment.
 
-With Formium Engine, you can easily use any front-end techonology you are familiar with to build user interface of applications. It is strongly recommended that you use the Single Page Applicaiton (SPA) to make the user interface, because this can give users a better operation experience. The mainstream Javascript frameworks, Angular, React, Vue are all wise choices that can be used to build SPA apps. For more information and examples about how to build apps with Formium, please see [Formium-Demos](https://github.com/NetDimension/Formium-Demos).
+Using NanUI will bring you unlimited possibilities for designing and developmenting the UI of traditional WinForm applications!
 
-**If you like NanUI project, please give it a star!**
+If you want to know more about NanUI project, please go to [NanUI Introduction](docs/README.md).
 
-## What's new
+![Preview](docs/images/preview.png)
 
-The latest changes at 2020/1/15, please see [CHANGES](./src/changelog.md) to check more details.
+**If you like NanUI project, please light up a star⭐ for this project!**
 
+Please consider rewarding the project author or sponsoring the project so that the NanUI project can be developed and iterated continuously. Thank you for your support and attention!
 
-## Documentation
+### Current Version：
 
-The Documentations will help you to start with Formium quickly. Contact me if you are willing to help translate the documentation. 
+- **Chromium** `80.0.3987.163`
+- **NanUI** `0.8.80.120`
 
-[Documentation](https://docs.formium.net)
+### Requirement
 
+- Windows 7 x86/x64 Service Pack 1 or newer
 
-## Install
+### Platforms
 
-The stable release of NanUI project uploads to NuGet. Using the commad below in NuGet Package Manager to install latest version of Formium Engine to your project. The dependencies associated with it will be automatically installed into your project too.
+- .NET 4.6.2/4.7/4.7.1/4.7.2/4.8
+- .NET Core 3.1
+- .NET 5.0
 
-**For .NET Framework 4.0+ / .NET Core 3.1**
+### Compile the source code
 
-Microsft .NET Framework 4.0 is the minimal version support to NetDimension.NanUI.dll.
+NanUI supports the framework from .NET 4.6.2 to the latest .NET 5.0, if you need to compile NanUI source code, you need to use **Visual Studio 2019 16.8 or higher**, and you need to install the corresponding .NET framework version:
 
-```
-PM> Install-Package NetDimension.NanUI
-```
+- .NET 4.6.2/4.7/4.7.1/4.7.2/4.8 SDK
+- .NET Core 3.1 SDK
+- .NET 5.0 SDK
 
-**IMPORTANT!** Unlike previous version of NanUI, this new version will no longer provide support for Window XP.
+If you only want to compile NanUI for a specific framework platform, please modify the `TargetFrameworks` property value in the project file yourself.
 
+---
 
+## Getting Start
 
-## Basic Usage
+If you want to learn more about NanUI or want to use NanUI for development as soon as possible, please navigate to [Welcome to NanUI](docs/README.en-US.md) to get documentation and sample code.
 
-Initialize the Runtime.
+The source code contains a sample project FormiumClient, you can quickly learn the relevant knowledge of NanUI through the source code of this project, it will also teach you how to use HTML / CSS / JavaScript to create your application.
 
-```C#
-using NetDimension.NanUI;
-class Program
-{
-   [STAThread]
-   static void Main(string[] args)
-   {
-      // ...
-      Bootstrap
-        .Initialize()
-        .Run(()=>new MainWindow());
-    }
-}
-```
+- [formium-client-frontend](src/formium-client-frontend/README.md)
 
-Using a browser host window.
-```C#
+  The front-end code of this project uses two hot frameworks, ReactJS and Bootstrap.
 
-using NetDimension.NanUI;
+- [FormiumClient](src/FormiumClient/README.md)
 
-class MainWindow : Formium
-{
-  // Set the startup url of this window
-  public override string StartUrl => "https://www.bing.com";
+  This project mainly shows you some examples of NanUI's form types, the use of resource controllers to load resources, and the communication between NanUI and JavaScript.
 
-  // Set the style of the host window, here set window to use the native style 
-  public override HostWindowType WindowType =>  HostWindowType.Standard;
+![Formium Client](docs/images/formium-client-preview-enUS.png)
 
-  // If you need to add a splash screen when the web page is first loaded, return the control instance of the splash screen here
-  protected override Control LaunchScreen => null;
+## License
 
-  public MainWindow()
-  {
-      // Set the base title of the window
-      Title = "NanUI Application";
-  }
+NanUI is MIT licensed. **The copyright of NanUI project is owned by the project's founder and developer Xuanchen Lin**.
 
-  protected override void OnWindowReady(IWebBrowserHandler browserClient)
-  {
-    // Add the processing functions of the CefClient's handlers here, such as DownloadHandler， LifeSpanHandler, DisplayHandler, etc. 
-  }
+Follow the MIT:
 
-  // Browser's Javascript context initialization is complete
-  protected override void OnRegisterGlobalObject(JSObject global)
-  {
-      // The C# objects can be injected into Javascript Context of this window here
-  }
+You should keep the copyright information of NanUI in your derivative project: `Powered by NanUI`.
 
-  protected override void OnStandardFormStyle(IStandardHostWindowStyle style)
-  {
-    // Define the basic style of the standard window here
-    style.MinimumSize = new System.Drawing.Size(1024, 640);
-    style.Size = new System.Drawing.Size(1280, 720);
-    style.Icon = <Icon File>;
-  }
-}
-```
+For more details of MIT [please see](docs/en-US/License.md). The NanUI project is based on many open source projects, for dependency licenses [please see](docs/en-US/Dependences.md)。
 
-## Donate
-NanUI is an MIT licensed open source project and completely free to use. However, the amount of effort needed to maintain and develop new features for the project is not sustainable without proper financial backing.
+---
 
-If you like this project and be sure of my work, you can buy me a cup of coffee, or you can become a backer or sponsor for helping the project better.
+## Reward and Sponsorship
+
+The NanUI project is an open source project based on the LGPL-3.0 agreement and it is completely free. Without proper financial support, project maintenance and the development of new features cannot be sustained. So if you like this project and approve of my work, you buy me a cup of coffee, or you can become a long-term project sponsor to help NanUI better.
+
+Use WeChat or Alipay to scan the QR code below to make a donation.
+
+![DONATE](docs/images/qrcode.png)
+
+If you are not in China, please click the icon below to jump to the PayPal to make a donation.
 
 [![DONATE](docs/images/paypal.png)](https://www.paypal.me/mrjson)
-
-
-
-
-
-
-
