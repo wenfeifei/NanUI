@@ -1,3 +1,5 @@
+using FormiumClient.Resources;
+
 using NetDimension.NanUI;
 using NetDimension.NanUI.HostWindow;
 using NetDimension.NanUI.JavaScript;
@@ -13,14 +15,17 @@ internal class StartupWindow : Formium
 
     public StartupWindow()
     {
-        Size = new System.Drawing.Size(680, 440);
-        MinimumSize = new System.Drawing.Size(640, 400);
+        Size = new Size(720, 440);
+        MinimumSize = new Size(640, 400);
         StartPosition = FormStartPosition.CenterScreen;
         Sizable = true;
-        Maximizable = false;
+        Maximizable = true;
         AllowFullScreen = false;
         EnableSplashScreen = false;
         AllowSystemMenu = false;
+
+        Title = Messages.StartupWindowTitle;
+
     }
 
     protected override void OnReady()

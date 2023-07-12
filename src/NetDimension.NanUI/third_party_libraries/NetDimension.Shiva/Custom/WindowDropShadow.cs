@@ -5,9 +5,9 @@ using static Vanara.PInvoke.User32;
 
 namespace NetDimension.NanUI.HostWindow;
 
-using Vortice;
-using Vortice.Direct2D1;
-using Vortice.Mathematics;
+//using Vortice;
+//using Vortice.Direct2D1;
+//using Vortice.Mathematics;
 
 internal class WindowDropShadow : IDisposable
 {
@@ -75,7 +75,7 @@ internal class WindowDropShadow : IDisposable
 
         var windowClass = new WindowClass(className, HINSTANCE.NULL, _windowProc);
 
-        var exStyles = WindowStylesEx.WS_EX_LEFT | WindowStylesEx.WS_EX_LTRREADING | WindowStylesEx.WS_EX_TOOLWINDOW | WindowStylesEx.WS_EX_NOPARENTNOTIFY | WindowStylesEx.WS_EX_LAYERED | WindowStylesEx.WS_EX_NOACTIVATE | WindowStylesEx.WS_EX_TRANSPARENT;
+        var exStyles = WindowStylesEx.WS_EX_LEFT | WindowStylesEx.WS_EX_LTRREADING | WindowStylesEx.WS_EX_NOPARENTNOTIFY | WindowStylesEx.WS_EX_LAYERED | WindowStylesEx.WS_EX_NOACTIVATE | WindowStylesEx.WS_EX_TRANSPARENT;
 
         var styles = WindowStyles.WS_CLIPSIBLINGS | WindowStyles.WS_CLIPCHILDREN | WindowStyles.WS_POPUP;
 
@@ -96,6 +96,7 @@ internal class WindowDropShadow : IDisposable
 
 
         if (width <= 0 || height <= 0) return;
+
 
 
         using (var bmp = new Bitmap(width, height))
@@ -130,10 +131,23 @@ internal class WindowDropShadow : IDisposable
     private void DrawShadowWithSKia(SKCanvas canvas, SKBitmap sourceBitmap, Bitmap destBitmap)
     {
 
-        //GetWindowRect(HWnd, out var rect);
+        GetWindowRect(ParentHWnd, out var parentRect);
 
-        //var width = rect.Width;
-        //var height = rect.Height;
+        InflateRect(ref parentRect, -ParentWindow.WindowNonclientAreaBorders.Left*2, -ParentWindow.WindowNonclientAreaBorders.Top*2);
+
+
+        var rectWidth = parentRect.Width;
+        var rectHeight = parentRect.Height;
+
+
+        var shadow= GetShadowSize(rectWidth, rectHeight,out var _);
+
+
+
+        var shadowWidth = shadow.Width;
+        var shadowHeight = shadow.Height;
+
+
 
 
         var config = ParentWindow.ShadowEffects[ParentWindow.ShadowEffect];
@@ -168,20 +182,20 @@ internal class WindowDropShadow : IDisposable
 
 
         var dTopLeft = new SKRect(0, 0, partSize, shadowSize);
-        var dTopRight = new SKRect(destBitmap.Width - partSize, 0, destBitmap.Width, shadowSize);
-        var dTop = new SKRect(partSize, 0, destBitmap.Width - partSize, shadowSize);
+        var dTopRight = new SKRect(shadowWidth - partSize, 0, shadowWidth, shadowSize);
+        var dTop = new SKRect(partSize, 0, shadowWidth - partSize, shadowSize);
 
-        var dBottomLeft = new SKRect(0, destBitmap.Height - shadowSize, partSize, destBitmap.Height);
-        var dBottomRight = new SKRect(destBitmap.Width - partSize, destBitmap.Height - shadowSize, destBitmap.Width, destBitmap.Height);
-        var dBottom = new SKRect(partSize, destBitmap.Height - shadowSize, destBitmap.Width - partSize, destBitmap.Height);
+        var dBottomLeft = new SKRect(0, shadowHeight - shadowSize, partSize, shadowHeight);
+        var dBottomRight = new SKRect(shadowWidth - partSize, shadowHeight - shadowSize, shadowWidth, shadowHeight);
+        var dBottom = new SKRect(partSize, shadowHeight - shadowSize, shadowWidth - partSize, shadowHeight);
 
         var dLeftTop = new SKRect(0, shadowSize, partSize, shadowSize + partSize);
-        var dLeftBottom = new SKRect(0, destBitmap.Height - shadowSize - partSize, partSize, destBitmap.Height - shadowSize);
-        var dLeft = new SKRect(0, shadowSize + partSize, partSize, destBitmap.Height - shadowSize - partSize);
+        var dLeftBottom = new SKRect(0, shadowHeight - shadowSize - partSize, partSize, shadowHeight - shadowSize);
+        var dLeft = new SKRect(0, shadowSize + partSize, partSize, shadowHeight - shadowSize - partSize);
 
-        var dRightTop = new SKRect(destBitmap.Width - partSize, shadowSize, destBitmap.Width, shadowSize + partSize);
-        var dRightBottom = new SKRect(destBitmap.Width - partSize, destBitmap.Height - shadowSize - partSize, destBitmap.Width, destBitmap.Height - shadowSize);
-        var dRight = new SKRect(destBitmap.Width - partSize, shadowSize + partSize, destBitmap.Width, destBitmap.Height - shadowSize - partSize);
+        var dRightTop = new SKRect(shadowWidth - partSize, shadowSize, shadowWidth, shadowSize + partSize);
+        var dRightBottom = new SKRect(shadowWidth - partSize, shadowHeight - shadowSize - partSize, shadowWidth, shadowHeight - shadowSize);
+        var dRight = new SKRect(shadowWidth - partSize, shadowSize + partSize, shadowWidth, shadowHeight - shadowSize - partSize);
 
         using (var paint = new SKPaint
         {
@@ -208,10 +222,7 @@ internal class WindowDropShadow : IDisposable
 
 
 
-        GetWindowRect(ParentHWnd, out var parentRect);
 
-        var rectWidth = parentRect.Width;
-        var rectHeight = parentRect.Height;
 
 
         using (var paint = new SKPaint
@@ -220,7 +231,11 @@ internal class WindowDropShadow : IDisposable
             Color = SKColors.Transparent
         })
         {
-            canvas.DrawRoundRect(new SKRoundRect(new SKRect(shadowSize + 1, shadowSize + 1, shadowSize + rectWidth - 1, shadowSize + rectHeight - 1), cornerSize), paint);
+            canvas.DrawRoundRect(new SKRoundRect(new SKRect(
+                shadowSize + ParentWindow.WindowNonclientAreaBorders.Left,
+                shadowSize + ParentWindow.WindowNonclientAreaBorders.Top,
+                shadowSize + rectWidth - ParentWindow.WindowNonclientAreaBorders.Right,
+                shadowSize + rectHeight - ParentWindow.WindowNonclientAreaBorders.Bottom), cornerSize), paint);
         }
     }
 
@@ -282,251 +297,251 @@ internal class WindowDropShadow : IDisposable
 
     #region Direct2D
 
-    ID2D1Factory _d2dFactory = null;
-    private ID2D1Bitmap LoadD2D1BitmapFromBitmap(ID2D1RenderTarget renderTarget, Bitmap origin)
-    {
-        Bitmap destBitmap;
+    //ID2D1Factory _d2dFactory = null;
+    //private ID2D1Bitmap LoadD2D1BitmapFromBitmap(ID2D1RenderTarget renderTarget, Bitmap origin)
+    //{
+    //    Bitmap destBitmap;
 
 
-        if (origin.PixelFormat != System.Drawing.Imaging.PixelFormat.Format32bppPArgb)
-        {
-            destBitmap = new Bitmap(origin.Width, origin.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-            using (Graphics g = Graphics.FromImage(destBitmap))
-            {
-                g.DrawImage(origin, 0, 0);
-                g.Flush();
-            }
-        }
-        else
-        {
-            destBitmap = (Bitmap)origin.Clone();
-        }
+    //    if (origin.PixelFormat != System.Drawing.Imaging.PixelFormat.Format32bppPArgb)
+    //    {
+    //        destBitmap = new Bitmap(origin.Width, origin.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+    //        using (Graphics g = Graphics.FromImage(destBitmap))
+    //        {
+    //            g.DrawImage(origin, 0, 0);
+    //            g.Flush();
+    //        }
+    //    }
+    //    else
+    //    {
+    //        destBitmap = (Bitmap)origin.Clone();
+    //    }
 
-        var bmpData = destBitmap.LockBits(new Rectangle(0, 0, destBitmap.Width, destBitmap.Height), System.Drawing.Imaging.ImageLockMode.ReadOnly, destBitmap.PixelFormat);
+    //    var bmpData = destBitmap.LockBits(new Rectangle(0, 0, destBitmap.Width, destBitmap.Height), System.Drawing.Imaging.ImageLockMode.ReadOnly, destBitmap.PixelFormat);
 
-        int buffSize = bmpData.Stride * destBitmap.Height;
+    //    int buffSize = bmpData.Stride * destBitmap.Height;
 
-        byte[] byteData = new byte[buffSize];
+    //    byte[] byteData = new byte[buffSize];
 
-        Marshal.Copy(bmpData.Scan0, byteData, 0, buffSize);
+    //    Marshal.Copy(bmpData.Scan0, byteData, 0, buffSize);
 
-        destBitmap.UnlockBits(bmpData);
+    //    destBitmap.UnlockBits(bmpData);
 
 
-        var bmpProps = new BitmapProperties
-        {
-            PixelFormat = new Vortice.DCommon.PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, Vortice.DCommon.AlphaMode.Premultiplied),
-            DpiX = 96,
-            DpiY = 96
-        };
+    //    var bmpProps = new BitmapProperties
+    //    {
+    //        PixelFormat = new Vortice.DCommon.PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, Vortice.DCommon.AlphaMode.Premultiplied),
+    //        DpiX = 96,
+    //        DpiY = 96
+    //    };
 
-        var d2d1Bmp = renderTarget.CreateBitmap(new SizeI(destBitmap.Width, destBitmap.Height), IntPtr.Zero, bmpData.Stride, bmpProps);
+    //    var d2d1Bmp = renderTarget.CreateBitmap(new Size(destBitmap.Width, destBitmap.Height), IntPtr.Zero, bmpData.Stride, bmpProps);
 
-        d2d1Bmp.CopyFromMemory(byteData, bmpData.Stride);
+    //    d2d1Bmp.CopyFromMemory(byteData, bmpData.Stride);
 
-        return d2d1Bmp;
+    //    return d2d1Bmp;
 
-    }
+    //}
 
-    ID2D1DCRenderTarget d2dRenderTarget = null;
+    //ID2D1DCRenderTarget d2dRenderTarget = null;
 
-    internal protected void RenderWithD2D(byte[] buff)
-    {
+    //internal protected void RenderWithD2D(byte[] buff)
+    //{
 
 
-        GetWindowRect(HWnd, out var rect);
+    //    GetWindowRect(HWnd, out var rect);
 
-        var width = rect.Width;
-        var height = rect.Height;
+    //    var width = rect.Width;
+    //    var height = rect.Height;
 
-        if (width <= 0 || height <= 0) return;
+    //    if (width <= 0 || height <= 0) return;
 
-        var renderProps = new RenderTargetProperties()
-        {
-            Type = RenderTargetType.Hardware,
-            Usage = RenderTargetUsage.None,
-            PixelFormat = new Vortice.DCommon.PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, Vortice.DCommon.AlphaMode.Premultiplied),
-            MinLevel = FeatureLevel.Default
-        };
+    //    var renderProps = new RenderTargetProperties()
+    //    {
+    //        Type = RenderTargetType.Hardware,
+    //        Usage = RenderTargetUsage.None,
+    //        PixelFormat = new Vortice.DCommon.PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, Vortice.DCommon.AlphaMode.Premultiplied),
+    //        MinLevel = FeatureLevel.Default
+    //    };
 
 
-        var screenDC = GetDC(HWND.NULL);
+    //    var screenDC = GetDC(HWND.NULL);
 
-        var memDC = Gdi32.CreateCompatibleDC(screenDC);
+    //    var memDC = Gdi32.CreateCompatibleDC(screenDC);
 
-        HBITMAP hBitmap = HBITMAP.NULL, hOldBitmap = HBITMAP.NULL;
+    //    HBITMAP hBitmap = HBITMAP.NULL, hOldBitmap = HBITMAP.NULL;
 
 
-        try
-        {
-            if (d2dRenderTarget == null)
-                d2dRenderTarget = _d2dFactory.CreateDCRenderTarget(renderProps);
+    //    try
+    //    {
+    //        if (d2dRenderTarget == null)
+    //            d2dRenderTarget = _d2dFactory.CreateDCRenderTarget(renderProps);
 
-            using (var destBitmap = new Bitmap(width, height))
-            using (var ms = new MemoryStream(buff))
-            using (var sourceBitmap = new Bitmap(ms))
-            using (var tplBmp = LoadD2D1BitmapFromBitmap(d2dRenderTarget, sourceBitmap))
-            {
+    //        using (var destBitmap = new Bitmap(width, height))
+    //        using (var ms = new MemoryStream(buff))
+    //        using (var sourceBitmap = new Bitmap(ms))
+    //        using (var tplBmp = LoadD2D1BitmapFromBitmap(d2dRenderTarget, sourceBitmap))
+    //        {
 
-                hBitmap = destBitmap.GetHbitmap(System.Drawing.Color.FromArgb(0, 0, 0, 0));
+    //            hBitmap = destBitmap.GetHbitmap(System.Drawing.Color.FromArgb(0, 0, 0, 0));
 
-                hOldBitmap = Gdi32.SelectObject(memDC, hBitmap);
+    //            hOldBitmap = Gdi32.SelectObject(memDC, hBitmap);
 
-                d2dRenderTarget.BindDC(memDC.DangerousGetHandle(), new RawRect(0, 0, width, height));
+    //            d2dRenderTarget.BindDC(memDC.DangerousGetHandle(), new RawRect(0, 0, width, height));
 
-                var config = ParentWindow.ShadowEffects[ParentWindow.ShadowEffect];
+    //            var config = ParentWindow.ShadowEffects[ParentWindow.ShadowEffect];
 
-                var cornerSize = ParentWindow.CornerSize;
+    //            var cornerSize = ParentWindow.CornerSize;
 
-                var shadowSize = config.Width;
+    //            var shadowSize = config.Width;
 
-                var partSize = shadowSize + cornerSize;
+    //            var partSize = shadowSize + cornerSize;
 
-                var sTopLeft = new RawRectF(0, 0, partSize, shadowSize);
-                var sTopRight = new RawRectF(sourceBitmap.Width - partSize, 0, sourceBitmap.Width, shadowSize);
-                var sTop = new RawRectF(partSize, 0, sourceBitmap.Width - partSize, shadowSize);
+    //            var sTopLeft = new RawRectF(0, 0, partSize, shadowSize);
+    //            var sTopRight = new RawRectF(sourceBitmap.Width - partSize, 0, sourceBitmap.Width, shadowSize);
+    //            var sTop = new RawRectF(partSize, 0, sourceBitmap.Width - partSize, shadowSize);
 
-                var sBottomLeft = new RawRectF(0, sourceBitmap.Height - shadowSize, partSize, sourceBitmap.Height);
-                var sBottomRight = new RawRectF(sourceBitmap.Width - partSize, sourceBitmap.Height - shadowSize, sourceBitmap.Width, sourceBitmap.Height);
-                var sBottom = new RawRectF(partSize, sourceBitmap.Height - shadowSize, sourceBitmap.Width - partSize, sourceBitmap.Height);
+    //            var sBottomLeft = new RawRectF(0, sourceBitmap.Height - shadowSize, partSize, sourceBitmap.Height);
+    //            var sBottomRight = new RawRectF(sourceBitmap.Width - partSize, sourceBitmap.Height - shadowSize, sourceBitmap.Width, sourceBitmap.Height);
+    //            var sBottom = new RawRectF(partSize, sourceBitmap.Height - shadowSize, sourceBitmap.Width - partSize, sourceBitmap.Height);
 
-                var sLeftTop = new RawRectF(0, shadowSize, partSize, shadowSize + partSize);
-                var sLeftBottom = new RawRectF(0, sourceBitmap.Height - shadowSize - partSize, partSize, sourceBitmap.Height - shadowSize);
-                var sLeft = new RawRectF(0, shadowSize + partSize, shadowSize, sourceBitmap.Height - shadowSize - partSize);
+    //            var sLeftTop = new RawRectF(0, shadowSize, partSize, shadowSize + partSize);
+    //            var sLeftBottom = new RawRectF(0, sourceBitmap.Height - shadowSize - partSize, partSize, sourceBitmap.Height - shadowSize);
+    //            var sLeft = new RawRectF(0, shadowSize + partSize, shadowSize, sourceBitmap.Height - shadowSize - partSize);
 
 
-                var sRightTop = new RawRectF(sourceBitmap.Width - partSize, shadowSize, sourceBitmap.Width, shadowSize + partSize);
-                var sRightBottom = new RawRectF(sourceBitmap.Width - partSize, sourceBitmap.Height - shadowSize - partSize, sourceBitmap.Width, sourceBitmap.Height - shadowSize);
-                var sRight = new RawRectF(sourceBitmap.Width - shadowSize, shadowSize + partSize, sourceBitmap.Width, sourceBitmap.Height - shadowSize - partSize);
+    //            var sRightTop = new RawRectF(sourceBitmap.Width - partSize, shadowSize, sourceBitmap.Width, shadowSize + partSize);
+    //            var sRightBottom = new RawRectF(sourceBitmap.Width - partSize, sourceBitmap.Height - shadowSize - partSize, sourceBitmap.Width, sourceBitmap.Height - shadowSize);
+    //            var sRight = new RawRectF(sourceBitmap.Width - shadowSize, shadowSize + partSize, sourceBitmap.Width, sourceBitmap.Height - shadowSize - partSize);
 
 
 
-                var dTopLeft = new RawRectF(0, 0, partSize, shadowSize);
-                var dTopRight = new RawRectF(destBitmap.Width - partSize, 0, destBitmap.Width, shadowSize);
-                var dTop = new RawRectF(partSize, 0, destBitmap.Width - partSize, shadowSize);
+    //            var dTopLeft = new RawRectF(0, 0, partSize, shadowSize);
+    //            var dTopRight = new RawRectF(destBitmap.Width - partSize, 0, destBitmap.Width, shadowSize);
+    //            var dTop = new RawRectF(partSize, 0, destBitmap.Width - partSize, shadowSize);
 
-                var dBottomLeft = new RawRectF(0, destBitmap.Height - shadowSize, partSize, destBitmap.Height);
-                var dBottomRight = new RawRectF(destBitmap.Width - partSize, destBitmap.Height - shadowSize, destBitmap.Width, destBitmap.Height);
-                var dBottom = new RawRectF(partSize, destBitmap.Height - shadowSize, destBitmap.Width - partSize, destBitmap.Height);
+    //            var dBottomLeft = new RawRectF(0, destBitmap.Height - shadowSize, partSize, destBitmap.Height);
+    //            var dBottomRight = new RawRectF(destBitmap.Width - partSize, destBitmap.Height - shadowSize, destBitmap.Width, destBitmap.Height);
+    //            var dBottom = new RawRectF(partSize, destBitmap.Height - shadowSize, destBitmap.Width - partSize, destBitmap.Height);
 
-                var dLeftTop = new RawRectF(0, shadowSize, partSize, shadowSize + partSize);
-                var dLeftBottom = new RawRectF(0, destBitmap.Height - shadowSize - partSize, partSize, destBitmap.Height - shadowSize);
-                var dLeft = new RawRectF(0, shadowSize + partSize, shadowSize, destBitmap.Height - shadowSize - partSize);
+    //            var dLeftTop = new RawRectF(0, shadowSize, partSize, shadowSize + partSize);
+    //            var dLeftBottom = new RawRectF(0, destBitmap.Height - shadowSize - partSize, partSize, destBitmap.Height - shadowSize);
+    //            var dLeft = new RawRectF(0, shadowSize + partSize, shadowSize, destBitmap.Height - shadowSize - partSize);
 
-                var dRightTop = new RawRectF(destBitmap.Width - partSize, shadowSize, destBitmap.Width, shadowSize + partSize);
-                var dRightBottom = new RawRectF(destBitmap.Width - partSize, destBitmap.Height - shadowSize - partSize, destBitmap.Width, destBitmap.Height - shadowSize);
-                var dRight = new RawRectF(destBitmap.Width - shadowSize, shadowSize + partSize, destBitmap.Width, destBitmap.Height - shadowSize - partSize);
+    //            var dRightTop = new RawRectF(destBitmap.Width - partSize, shadowSize, destBitmap.Width, shadowSize + partSize);
+    //            var dRightBottom = new RawRectF(destBitmap.Width - partSize, destBitmap.Height - shadowSize - partSize, destBitmap.Width, destBitmap.Height - shadowSize);
+    //            var dRight = new RawRectF(destBitmap.Width - shadowSize, shadowSize + partSize, destBitmap.Width, destBitmap.Height - shadowSize - partSize);
 
 
-                GetWindowRect(ParentHWnd, out var parentRect);
+    //            GetWindowRect(ParentHWnd, out var parentRect);
 
-                var rectWidth = parentRect.Width;
-                var rectHeight = parentRect.Height;
+    //            var rectWidth = parentRect.Width;
+    //            var rectHeight = parentRect.Height;
 
-                d2dRenderTarget.BeginDraw();
+    //            d2dRenderTarget.BeginDraw();
 
-                d2dRenderTarget.Clear(new ColorBgra(0));
+    //            d2dRenderTarget.Clear(new ColorBgra(0));
 
-                using (var rectMask = _d2dFactory.CreateRectangleGeometry(Rect.FromLTRB(0, 0, width, height)))
-                using (var rrectMask = _d2dFactory.CreateRoundedRectangleGeometry(new RoundedRectangle(Rect.FromLTRB(shadowSize, shadowSize, shadowSize + rectWidth, shadowSize + rectHeight), cornerSize, cornerSize)))
-                using (var retvalMask = _d2dFactory.CreatePathGeometry())
-                using (var layer = d2dRenderTarget.CreateLayer(new Size(width, height)))
+    //            using (var rectMask = _d2dFactory.CreateRectangleGeometry(RectangleF.FromLTRB(0, 0, width, height)))
+    //            using (var rrectMask = _d2dFactory.CreateRoundedRectangleGeometry(new RoundedRectangle(RectangleF.FromLTRB(shadowSize, shadowSize, shadowSize + rectWidth, shadowSize + rectHeight), cornerSize, cornerSize)))
+    //            using (var retvalMask = _d2dFactory.CreatePathGeometry())
+    //            using (var layer = d2dRenderTarget.CreateLayer(new Size(width, height)))
 
-                {
+    //            {
 
-                    var sink = retvalMask.Open();
-                    rectMask.CombineWithGeometry(rrectMask, CombineMode.Exclude, sink);
-                    sink.Close();
+    //                var sink = retvalMask.Open();
+    //                rectMask.CombineWithGeometry(rrectMask, CombineMode.Exclude, sink);
+    //                sink.Close();
 
 
 
 
-                    var lparam = new LayerParameters
-                    {
-                        ContentBounds = new RawRectF(0, 0, width, height),
-                        GeometricMask = retvalMask,
-                        Opacity = 1,
-                        MaskTransform = System.Numerics.Matrix3x2.Identity,
-                        LayerOptions = LayerOptions.None,
+    //                var lparam = new LayerParameters
+    //                {
+    //                    ContentBounds = new RawRectF(0, 0, width, height),
+    //                    GeometricMask = retvalMask,
+    //                    Opacity = 1,
+    //                    MaskTransform = System.Numerics.Matrix3x2.Identity,
+    //                    LayerOptions = LayerOptions.None,
 
-                        MaskAntialiasMode = AntialiasMode.PerPrimitive
-                    };
+    //                    MaskAntialiasMode = AntialiasMode.PerPrimitive
+    //                };
 
 
-                    d2dRenderTarget.PushLayer(lparam, layer);
+    //                d2dRenderTarget.PushLayer(lparam, layer);
 
 
-                    d2dRenderTarget.DrawBitmap(tplBmp, dTopLeft, 1.0f, BitmapInterpolationMode.Linear, sTopLeft);
-                    d2dRenderTarget.DrawBitmap(tplBmp, dTopRight, 1.0f, BitmapInterpolationMode.Linear, sTopRight);
-                    d2dRenderTarget.DrawBitmap(tplBmp, dTop, 1.0f, BitmapInterpolationMode.Linear, sTop);
+    //                d2dRenderTarget.DrawBitmap(tplBmp, dTopLeft, 1.0f, BitmapInterpolationMode.Linear, sTopLeft);
+    //                d2dRenderTarget.DrawBitmap(tplBmp, dTopRight, 1.0f, BitmapInterpolationMode.Linear, sTopRight);
+    //                d2dRenderTarget.DrawBitmap(tplBmp, dTop, 1.0f, BitmapInterpolationMode.Linear, sTop);
 
-                    d2dRenderTarget.DrawBitmap(tplBmp, dBottomLeft, 1.0f, BitmapInterpolationMode.Linear, sBottomLeft);
-                    d2dRenderTarget.DrawBitmap(tplBmp, dBottomRight, 1.0f, BitmapInterpolationMode.Linear, sBottomRight);
-                    d2dRenderTarget.DrawBitmap(tplBmp, dBottom, 1.0f, BitmapInterpolationMode.Linear, sBottom);
+    //                d2dRenderTarget.DrawBitmap(tplBmp, dBottomLeft, 1.0f, BitmapInterpolationMode.Linear, sBottomLeft);
+    //                d2dRenderTarget.DrawBitmap(tplBmp, dBottomRight, 1.0f, BitmapInterpolationMode.Linear, sBottomRight);
+    //                d2dRenderTarget.DrawBitmap(tplBmp, dBottom, 1.0f, BitmapInterpolationMode.Linear, sBottom);
 
-                    d2dRenderTarget.DrawBitmap(tplBmp, dLeftTop, 1.0f, BitmapInterpolationMode.Linear, sLeftTop);
-                    d2dRenderTarget.DrawBitmap(tplBmp, dLeftBottom, 1.0f, BitmapInterpolationMode.Linear, sLeftBottom);
-                    d2dRenderTarget.DrawBitmap(tplBmp, dLeft, 1.0f, BitmapInterpolationMode.Linear, sLeft);
+    //                d2dRenderTarget.DrawBitmap(tplBmp, dLeftTop, 1.0f, BitmapInterpolationMode.Linear, sLeftTop);
+    //                d2dRenderTarget.DrawBitmap(tplBmp, dLeftBottom, 1.0f, BitmapInterpolationMode.Linear, sLeftBottom);
+    //                d2dRenderTarget.DrawBitmap(tplBmp, dLeft, 1.0f, BitmapInterpolationMode.Linear, sLeft);
 
-                    d2dRenderTarget.DrawBitmap(tplBmp, dRightTop, 1.0f, BitmapInterpolationMode.Linear, sRightTop);
-                    d2dRenderTarget.DrawBitmap(tplBmp, dRightBottom, 1.0f, BitmapInterpolationMode.Linear, sRightBottom);
-                    d2dRenderTarget.DrawBitmap(tplBmp, dRight, 1.0f, BitmapInterpolationMode.Linear, sRight);
+    //                d2dRenderTarget.DrawBitmap(tplBmp, dRightTop, 1.0f, BitmapInterpolationMode.Linear, sRightTop);
+    //                d2dRenderTarget.DrawBitmap(tplBmp, dRightBottom, 1.0f, BitmapInterpolationMode.Linear, sRightBottom);
+    //                d2dRenderTarget.DrawBitmap(tplBmp, dRight, 1.0f, BitmapInterpolationMode.Linear, sRight);
 
-                    d2dRenderTarget.PopLayer();
+    //                d2dRenderTarget.PopLayer();
 
 
 
 
-                }
+    //            }
 
-                if (d2dRenderTarget.EndDraw().Failure)
-                {
-                    d2dRenderTarget?.Dispose();
-                    d2dRenderTarget = null;
-                }
+    //            if (d2dRenderTarget.EndDraw().Failure)
+    //            {
+    //                d2dRenderTarget?.Dispose();
+    //                d2dRenderTarget = null;
+    //            }
 
-                UpdateLayeredWindowWithD2D(screenDC, memDC);
+    //            UpdateLayeredWindowWithD2D(screenDC, memDC);
 
-            }
-        }
-        finally
-        {
+    //        }
+    //    }
+    //    finally
+    //    {
 
 
-            if (memDC != HDC.NULL && hOldBitmap != HBITMAP.NULL)
-            {
-                Gdi32.SelectObject(memDC, hOldBitmap);
+    //        if (memDC != HDC.NULL && hOldBitmap != HBITMAP.NULL)
+    //        {
+    //            Gdi32.SelectObject(memDC, hOldBitmap);
 
-            }
+    //        }
 
-            if (hBitmap != HBITMAP.NULL)
-            {
-                Gdi32.DeleteObject(hBitmap);
-            }
+    //        if (hBitmap != HBITMAP.NULL)
+    //        {
+    //            Gdi32.DeleteObject(hBitmap);
+    //        }
 
-            if (memDC != HDC.NULL)
-            {
-                Gdi32.DeleteDC(memDC);
-            }
+    //        if (memDC != HDC.NULL)
+    //        {
+    //            Gdi32.DeleteDC(memDC);
+    //        }
 
-            if (screenDC != HDC.NULL)
-            {
-                ReleaseDC(HWND.NULL, screenDC);
-            }
+    //        if (screenDC != HDC.NULL)
+    //        {
+    //            ReleaseDC(HWND.NULL, screenDC);
+    //        }
 
 
-        }
-    }
+    //    }
+    //}
 
 
-    internal protected void UpdateLayeredWindowWithD2D(Gdi32.SafeHDC screenDC, Gdi32.SafeHDC memDC)
-    {
-        GetWindowRect(HWnd, out var rect);
-        var size = rect.Size;
-        var location = rect.Location;
+    //internal protected void UpdateLayeredWindowWithD2D(Gdi32.SafeHDC screenDC, Gdi32.SafeHDC memDC)
+    //{
+    //    GetWindowRect(HWnd, out var rect);
+    //    var size = rect.Size;
+    //    var location = rect.Location;
 
-        UpdateLayeredWindow(HWnd, screenDC, location, size, memDC, Point.Empty, COLORREF.None, blendfunction, UpdateLayeredWindowFlags.ULW_ALPHA);
-    }
+    //    UpdateLayeredWindow(HWnd, screenDC, location, size, memDC, Point.Empty, COLORREF.None, blendfunction, UpdateLayeredWindowFlags.ULW_ALPHA);
+    //}
 
 
     #endregion
@@ -552,15 +567,15 @@ internal class WindowDropShadow : IDisposable
     }
 
 
-    internal SizeI GetShadowSize(int winWidth, int winHeight)
+    internal Size GetShadowSize(int winWidth, int winHeight, out int shadowSize)
     {
         var config = ParentWindow.ShadowEffects[ParentWindow.ShadowEffect];
 
-        var shadowSize = config.Width;
+        shadowSize = config.Width;
 
-        return new SizeI(winWidth + shadowSize * 2, winHeight + shadowSize * 2);
+        return new Size(winWidth + shadowSize * 2, winHeight + shadowSize*2);
     }
-    internal Point GetShadowLocation(int x, int y, int cx, int cy)
+    internal Point GetShadowLocation(int x, int y)
     {
         var config = ParentWindow.ShadowEffects[ParentWindow.ShadowEffect];
 

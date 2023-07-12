@@ -31,12 +31,17 @@ public sealed class ChromiumEnvironmentBuilder
 
     private readonly RuntimeBuilderContext _context;
 
+    private  CefProcessType ProcessType { get; }
+
+
     internal ChromiumEnvironmentBuilder(RuntimeBuilderContext runtimeBuilderContext)
     {
         _context = runtimeBuilderContext;
 
         Container = (ServiceContainer)_context.Properties[typeof(ServiceContainer)];
 
+        var args = Environment.GetCommandLineArgs();
+        ProcessType = args.FirstOrDefault(x => x.StartsWith("--type=")) == null ? CefProcessType.Browser : CefProcessType.Renderer;
 
 
     }
@@ -198,7 +203,12 @@ public sealed class ChromiumEnvironmentBuilder
         if (_externalSubprocessConfiguration == null)
             _externalSubprocessConfiguration = new ExternalSubprocessConfiguration();
 
-        useExternalSubprocessConfiguration?.Invoke(_externalSubprocessConfiguration);
+        if (ProcessType == CefProcessType.Browser)
+        {
+            useExternalSubprocessConfiguration?.Invoke(_externalSubprocessConfiguration);
+        }
+
+
 
         return this;
     }
@@ -309,13 +319,16 @@ public sealed class ChromiumEnvironmentBuilder
 
         if (_externalSubprocessConfiguration != null)
         {
-            if (!File.Exists(_externalSubprocessConfiguration.SubprocessPath))
-            {
-                throw new FileNotFoundException($"Can't find the path {_externalSubprocessConfiguration.SubprocessPath}.");
-            }
-            else
+            if (File.Exists(_externalSubprocessConfiguration.SubprocessPath))
             {
                 env.SubprocessPath = _externalSubprocessConfiguration.SubprocessPath;
+
+            }
+            else if(!_externalSubprocessConfiguration.ShouldContinueToRun)
+            {
+                Environment.Exit(0);
+
+                return null;
             }
         }
 
@@ -336,18 +349,20 @@ public sealed class ChromiumEnvironmentBuilder
 public sealed class CefBinaryFilePathConfiguration
 {
 
-    public PlatformArchitecture PlatformArchitecture => PlatformArchitecture;
+    public PlatformArchitecture PlatformArchitecture => WinFormium.PlatformArchitecture;
     public string CurrentApplicationRunningDirectory => WinFormium.ApplicationRunningDirectory;
     public string CefBinaryFileDirectory { internal get; set; }
 }
 
 public sealed class ExternalSubprocessConfiguration
 {
-    public PlatformArchitecture PlatformArchitecture => PlatformArchitecture;
+    public PlatformArchitecture PlatformArchitecture => WinFormium.PlatformArchitecture;
 
     internal string SubprocessPath { get; private set; }
 
-    public void UseCustomSubprocessPath(string subprocessPath)
+    internal bool ShouldContinueToRun { get; private set; } = true;
+
+    public void UseCustomSubprocessPath(string subprocessPath, Func<string, bool> subprocessNotExistsHandler = null)
     {
         if (File.Exists(subprocessPath))
         {
@@ -355,7 +370,13 @@ public sealed class ExternalSubprocessConfiguration
             return;
         }
 
-        throw new FileNotFoundException($"Can't find the path {subprocessPath}.");
+
+        var retval = subprocessNotExistsHandler?.Invoke(subprocessPath) ?? false;
+
+        if (!retval)
+        {
+            ShouldContinueToRun = false;
+        }
 
     }
 }

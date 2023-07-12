@@ -3,7 +3,7 @@
     <PropertyGroup>
         <LangVersion>latest</LangVersion>
         <OutputType>Library</OutputType>
-        <TargetFrameworks>net6.0-windows;net5.0-windows;netcoreapp3.1;net48;net472;net471;net47;net462;</TargetFrameworks>
+        <TargetFrameworks>net7.0-windows;net6.0-windows;net5.0-windows;netcoreapp3.1;net48;net481;net472;net471;net47;net462;</TargetFrameworks>
         <UseWindowsForms>true</UseWindowsForms>
         <Description>NanUI is an open source .NET component for Windows Form Applications. It's base on Chromium Embedded Framework. All .NET developers who wants to use front-end technologies such as HTML5/CSS3/JavaScript to design the user interface of Windows Form Applications.</Description>
         <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
@@ -78,6 +78,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Remove="Browser\BrowserProcess\Handlers\WinFormiumRenderHandlerUsingDeviceContext_D2D.cs" />
         <Compile Remove="Browser\BrowserProcess\Handlers\WinFormiumRenderHandlerUsingHwnd.cs" />
         <Compile Remove="HostWindow\AcrylicStyleHostWindow.cs" />
         <Compile Remove="HostWindow\ExtendedStyles\AcrylicWindowStyle.cs" />
@@ -96,16 +97,13 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-        <PackageReference Include="SkiaSharp" Version="2.88.0" />
-        <PackageReference Include="Vanara.PInvoke.DwmApi" Version="3.4.3" />
-        <PackageReference Include="Vanara.PInvoke.SHCore" Version="3.4.3" />
-        <PackageReference Include="Vanara.PInvoke.User32" Version="3.4.3" />
-        <PackageReference Include="Vanara.PInvoke.UxTheme" Version="3.4.3" />
-        <PackageReference Include="Vortice.Direct2D1" Version="2.1.19" />
-        <PackageReference Include="Vortice.Direct3D11" Version="2.1.19" />
-        <PackageReference Include="Vortice.DXGI" Version="2.1.19" />
-        <PackageReference Include="Vortice.Mathematics" Version="1.4.16" />
+        <PackageReference Include="SkiaSharp" Version="2.88.3" />
+        <PackageReference Include="System.Net.Http" Version="4.3.4" />
+        <PackageReference Include="System.Text.Json" Version="7.0.2" />
+        <PackageReference Include="Vanara.PInvoke.DwmApi" Version="3.4.12" />
+        <PackageReference Include="Vanara.PInvoke.SHCore" Version="3.4.12" />
+        <PackageReference Include="Vanara.PInvoke.User32" Version="3.4.12" />
+        <PackageReference Include="Vanara.PInvoke.UxTheme" Version="3.4.12" />
     </ItemGroup>
 
     <ItemGroup>
@@ -113,6 +111,7 @@
             <Pack>True</Pack>
             <PackagePath></PackagePath>
         </None>
+        <None Include="Browser\BrowserProcess\Handlers\WinFormiumRenderHandlerUsingDeviceContext_D2D.cs" />
         <None Include="Browser\BrowserProcess\Handlers\WinFormiumRenderHandlerUsingHwnd.cs" />
         <None Include="HostWindow\AcrylicStyleHostWindow.cs" />
         <None Include="HostWindow\ExtendedStyles\AcrylicWindowStyle.cs" />

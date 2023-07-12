@@ -1,9 +1,9 @@
 # NanUI
 
-![GitHub](https://img.shields.io/github/license/NetDimension/NanUI)
+![GitHub](https://img.shields.io/github/license/xuanchenlin/NanUI)
 ![Nuget](https://img.shields.io/nuget/dt/NetDimension.NanUI?label=NuGet)
 ![Nuget](https://img.shields.io/nuget/v/NetDimension.NanUI)
-![CI](https://github.com/netdimension/nanui/actions/workflows/main.yml/badge.svg)
+![CI](https://github.com/xuanchenlin/nanui/actions/workflows/main.yml/badge.svg)
 
 中文 | [English](README.en.md)
 
@@ -31,6 +31,12 @@ NanUI 基于谷歌可嵌入的浏览器框架 Chromium Embedded Framework (CEF)�
 **如果你喜欢 NanUI 项目，请为本项点亮一颗星 ⭐！**
 
 此外也请您考虑打赏项目作者或者为项目提供赞助，以便 NanUI 项目得以长期开发和持续迭代，感谢您的支持和关注！
+
+## 示例体验
+
+您可以在当前页面右侧“发行版”或者“Release”栏位里下载打包好的示例程序进行体验。
+
+请注意，如果您需要在 Windows 7 上体验示例程序，那么请确保它已经升级到了 ServicePack 1 并且安装了 DirectX 11 的支持程序。
 
 ### 当前 NanUI 版本：
 

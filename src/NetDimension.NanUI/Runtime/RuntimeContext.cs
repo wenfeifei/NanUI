@@ -1,3 +1,5 @@
+using System.Linq;
+
 using NetDimension.NanUI.Browser;
 using NetDimension.NanUI.Browser.ResourceHandler;
 using NetDimension.NanUI.Logging;
@@ -109,6 +111,8 @@ public sealed class RuntimeContext
 
         var exitCode = CefRuntime.ExecuteProcess(cefMainArgs, app, IntPtr.Zero);
 
+        //ApplicationConfiguration.UseExtensions[(int)ExtensionExecutePosition.BrowserProcessInitialized]?.Invoke(this, ApplicationProperties);
+
         return exitCode;
     }
 
@@ -175,6 +179,9 @@ https://github.com/NetDimension/NanUI/blob/master/LICENCE
             return exitCode;
         }
 
+        Logger.Info(string.Format("CefRuntime.ExecuteProcess() arguments:\r\n{0}", string.Join("\r\n",args)));
+
+
         foreach (var arg in args)
         {
             if (arg.StartsWith("--type="))
@@ -208,10 +215,11 @@ https://github.com/NetDimension/NanUI/blob/master/LICENCE
             settings.BrowserSubprocessPath = ChromiumEnvironment.SubprocessPath;
         }
 
-
         CefRuntime.Initialize(new CefMainArgs(args), settings, app, IntPtr.Zero);
 
         ApplicationConfiguration.UseExtensions[(int)ExtensionExecutePosition.BrowserProcessInitialized]?.Invoke(this, ApplicationProperties);
+
+
 
         foreach (var config in CustomResourceHandlerConfigurations)
         {

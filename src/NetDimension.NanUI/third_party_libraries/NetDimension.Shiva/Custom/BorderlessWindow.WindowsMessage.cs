@@ -1,6 +1,8 @@
+
 using Vanara.Extensions;
 using Vanara.PInvoke;
 
+using static Vanara.PInvoke.DwmApi;
 using static Vanara.PInvoke.User32;
 
 namespace NetDimension.NanUI.HostWindow;
@@ -43,7 +45,21 @@ internal partial class BorderlessWindow
                     }
                 }
                 break;
+            case (int)WindowMessage.WM_ACTIVATE:
+                {
+                    base.WndProc(ref m);
+                    DwmExtendFrameIntoClientArea(hWnd, new MARGINS(0));
 
+                }
+                break;
+            case (int)WindowMessage.WM_PAINT:
+                {
+                    if (!WmPaint(ref m))
+                    {
+                        base.WndProc(ref m);
+                    }
+                }
+                break;
             case (int)WindowMessage.WM_NCPAINT:
                 {
                     if (!WmNCPaint(ref m))
@@ -62,6 +78,14 @@ internal partial class BorderlessWindow
                     }
                 }
                 break;
+            case (int)WindowMessage.WM_WINDOWPOSCHANGING:
+                {
+                    if (!WmWindowPosChanging(ref m))
+                    {
+                        base.WndProc(ref m);
+                    }
+                }
+                break;
             case (int)WindowMessage.WM_WINDOWPOSCHANGED:
                 {
 
@@ -74,18 +98,26 @@ internal partial class BorderlessWindow
                 break;
             case (int)WindowMessage.WM_ACTIVATEAPP:
                 {
-                    InvalidateNonClientArea();
-                    SendFrameChangedMessage();
-
                     if (!WmActiveApp(ref m))
                     {
-
-
                         base.WndProc(ref m);
                     }
                 }
                 break;
+            case (int)WindowMessage.WM_SHOWWINDOW:
+                {
 
+                    if (m.WParam != IntPtr.Zero)
+                    {
+                        SetForegroundWindow(m.HWnd);
+                        SetFocus(m.HWnd);
+                    }
+
+                    base.WndProc(ref m);
+
+                    UpdateBorderPath();
+                }
+                break;
             case (int)WindowMessage.WM_NCACTIVATE:
                 {
                     if (!WmNCActive(ref m))
@@ -153,6 +185,36 @@ internal partial class BorderlessWindow
 
 
 
+    private void UpdateBorderPath()
+    {
+        if (WindowState == FormWindowState.Maximized)
+        {
+            if (Bounds.X == -32000 && Bounds.Y == -32000)
+            {
+                return;
+            }
+
+            _shouldPerformMaximiazedState = true;
+
+            var screen = Screen.FromHandle(Handle);
+
+            var bounds = FormBorderStyle == FormBorderStyle.None ? screen.Bounds : screen.WorkingArea;
+
+            var regionBounds = new Rectangle(bounds.X - Bounds.X, bounds.Y - Bounds.Y, Bounds.Width - (Bounds.Width - bounds.Width), Bounds.Height - (Bounds.Height - bounds.Height));
+
+            SetWindowRegion(regionBounds);
+        }
+        else if (WindowState == FormWindowState.Normal && _windowCornerStyle != CornerStyle.None)
+        {
+            using var roundedRect = GetWindowBorderPath();
+            SetWindowRegion(roundedRect);
+        }
+        else
+        {
+            RemoveWindowRegion();
+        }
+    }
+
 
     private bool WmActiveApp(ref Message m)
     {
@@ -166,12 +228,6 @@ internal partial class BorderlessWindow
         {
             IsApplicationForeground = true;
             SetApplicationFocus();
-
-            if (WindowState == FormWindowState.Normal)
-            {
-                using var roundedRect = GetWindowBorderPath();
-                SetWindowRegion(roundedRect);
-            }
         }
 
         return false;
@@ -181,22 +237,14 @@ internal partial class BorderlessWindow
     {
         var isActive = IsWindowFocused = (m.WParam == TRUE);
 
-
-
-
         if (MinMaxState == FormWindowState.Minimized)
         {
             DefWndProc(ref m);
         }
         else
         {
-
-
             m.Result = MESSAGE_HANDLED;
 
-            InvalidateNonClientArea();
-
-            SendFrameChangedMessage();
             if (isActive)
             {
                 SetWindowFocus();
@@ -205,68 +253,104 @@ internal partial class BorderlessWindow
             {
                 KillWindowFocus();
             }
+
             UpdateShadowZOrder();
         }
 
-
-
         return true;
+    }
+    private bool WmWindowPosChanging(ref Message m)
+    {
+        var windowpos = m.LParam.ToStructure<WINDOWPOS>();
+
+        windowpos.flags |= SetWindowPosFlags.SWP_NOCOPYBITS;
+
+        Marshal.StructureToPtr(windowpos, m.LParam, true);
+
+        return false;
+
     }
 
     private bool WmWindowPosChanged(ref Message m)
     {
         var windowpos = m.LParam.ToStructure<WINDOWPOS>();
 
-        if (!IsIconic(hWnd))
+        var flags = SetWindowPosFlags.SWP_NOSIZE | SetWindowPosFlags.SWP_NOMOVE;
+
+        if (!IsIconic(hWnd) /*&& ((windowpos.flags & flags) != flags)*/)
         {
             UpdateShadowPos(windowpos);
         }
 
-
         return false;
     }
 
+    private void UpdateWindowSizeIndirect(RECT rect)
+    {
 
+        if (!IsIconic(hWnd))
+        {
+            if (!_isShadowInitialized) return;
+
+            var shadowRect = rect;
+
+            InflateRect(ref shadowRect, -WindowNonclientAreaBorders.Left * 2, -WindowNonclientAreaBorders.Top * 2);
+
+            var pt = _shadow.GetShadowLocation(shadowRect.X, shadowRect.Y);
+
+            var size = _shadow.GetShadowSize(shadowRect.Width, shadowRect.Height, out var shadowSize);
+
+            var flags = SetWindowPosFlags.SWP_NOACTIVATE | SetWindowPosFlags.SWP_NOZORDER;
+
+            //if ((windowpos.flags & SetWindowPosFlags.SWP_NOSIZE) == SetWindowPosFlags.SWP_NOSIZE)
+            //{
+            //    flags |= SetWindowPosFlags.SWP_NOSIZE;
+            //}
+
+            //if ((windowpos.flags & SetWindowPosFlags.SWP_NOMOVE) == SetWindowPosFlags.SWP_NOMOVE)
+            //{
+            //    flags |= SetWindowPosFlags.SWP_NOMOVE;
+            //}
+
+            SetWindowPos(_shadow.HWnd, hWnd, pt.X, pt.Y, size.Width, size.Height, flags);
+
+            SetWindowPos(hWnd, HWND.NULL, rect.X, rect.Y, rect.Width, rect.Height, SetWindowPosFlags.SWP_FRAMECHANGED | SetWindowPosFlags.SWP_NOZORDER);
+
+            SendMessage(hWnd, WindowMessage.WM_SIZE, 0, Macros.MAKELPARAM((ushort)rect.Width, (ushort)rect.Height));
+        }
+    }
 
     private bool WmSize(ref Message m)
     {
         if (!_isLoaded)
             return false;
 
-        if (WindowState == FormWindowState.Maximized)
-        {
-            _shouldPerformMaximiazedState = true;
-
-            var screen = Screen.FromHandle(Handle);
-
-            var bounds = FormBorderStyle == FormBorderStyle.None ? screen.Bounds : screen.WorkingArea;
-
-            var regionBounds = new Rectangle(bounds.X - Bounds.X, bounds.Y - Bounds.Y, Bounds.Width - (Bounds.Width - bounds.Width), Bounds.Height - (Bounds.Height - bounds.Height));
-
-            SetWindowRegion(regionBounds);
-        }
-        else if (WindowState == FormWindowState.Normal)
-        {
-            using var roundedRect = GetWindowBorderPath();
-            SetWindowRegion(roundedRect);
-        }
-        else
-        {
-            RemoveWindowRegion();
-        }
-
-        SendFrameChangedMessage();
-
         ResizeShadow(ref m);
 
         return false;
     }
 
+
+
+    //private bool WmSizing(ref Message m)
+    //{
+    //    var rect = m.LParam.ToStructure<RECT>();
+
+    //    UpdateWindowSizeIndirect(rect);
+
+    //    rect = new RECT(Bounds);
+
+    //    Marshal.StructureToPtr(rect, m.LParam, true);
+
+
+    //    return true;
+    //}
+
+
+
     private bool WmCreate(ref Message m)
     {
         GetWindowRect(m.HWnd, out var rcClient);
-
-        //SetWindowPos(m.HWnd, HWND.NULL, rcClient.left, rcClient.top, rcClient.Width, rcClient.Height, SetWindowPosFlags.SWP_FRAMECHANGED);
 
         SetWindowPos(m.HWnd, HWND.NULL, Location.X, Location.Y, rcClient.Width, rcClient.Height, SetWindowPosFlags.SWP_FRAMECHANGED);
 
@@ -278,22 +362,37 @@ internal partial class BorderlessWindow
         if (m.WParam == TRUE)
         {
             var nccsp = Marshal.PtrToStructure<NCCALCSIZE_PARAMS>(m.LParam);
+            var ncBorders = GetNonClientAeraBorders();
 
             if (WindowState != FormWindowState.Maximized && WindowState != FormWindowState.Minimized)
             {
+                nccsp.rgrc0.top -= ncBorders.Top;
+                nccsp.rgrc0.bottom += ncBorders.Bottom;
+                nccsp.rgrc0.left -= ncBorders.Left;
+                nccsp.rgrc0.right += ncBorders.Right;
+
+
+                nccsp.rgrc0.top += WindowNonclientAreaBorders.Top;
+                nccsp.rgrc0.bottom -= WindowNonclientAreaBorders.Bottom;
+                nccsp.rgrc0.left += WindowNonclientAreaBorders.Left;
+                nccsp.rgrc0.right -= WindowNonclientAreaBorders.Right;
+
+
                 m.Result = MESSAGE_PROCESS;
 
-                return true;
+                Marshal.StructureToPtr(nccsp, m.LParam, true);
+
+                m.Result = (nint)0x400;
+                //return true;
             }
             else if (WindowState == FormWindowState.Maximized)
             {
 
-                var ncBorders = GetNonClientAeraBorders();
 
                 nccsp.rgrc0.top -= ncBorders.Top;
                 nccsp.rgrc0.top += ncBorders.Bottom;
 
-                Marshal.StructureToPtr(nccsp, m.LParam, false);
+                Marshal.StructureToPtr(nccsp, m.LParam, true);
                 m.Result = MESSAGE_PROCESS;
             }
         }
@@ -301,18 +400,84 @@ internal partial class BorderlessWindow
         return false;
     }
 
+    private bool WmPaint(ref Message m)
+    {
+        UpdateBorderPath();
+
+        return false;
+    }
 
     private bool WmNCPaint(ref Message m)
     {
-        if (!IsHandleCreated)
+        if (m.HWnd == IntPtr.Zero) return false;
+
+
+        GetWindowRect(m.HWnd, out var bounds);
+
+        if (bounds.Width <= 0 || bounds.Height <= 0)
         {
             return false;
         }
 
-        m.Result = MESSAGE_PROCESS;
+        var dcxFlags = DCX.DCX_WINDOW | DCX.DCX_CACHE | DCX.DCX_CLIPSIBLINGS | DCX.DCX_VALIDATE;
+
+        var hRegion = IntPtr.Zero;
+
+        if (m.WParam != (nint)1)
+        {
+            dcxFlags |= DCX.DCX_INTERSECTRGN;
+            hRegion = m.WParam;
+        }
+
+
+
+
+        var dc = GetDCEx(Handle, hRegion, dcxFlags);
+
+        try
+        {
+            if (dc != IntPtr.Zero)
+            {
+
+                GetClientRect(m.HWnd, out var clientRect);
+
+                OffsetRect(ref clientRect, WindowNonclientAreaBorders.Left, WindowNonclientAreaBorders.Top);
+
+                OffsetRect(ref bounds, -bounds.left, -bounds.top);
+
+
+                using var graphics = Graphics.FromHdc(dc.DangerousGetHandle());
+                using var region = new Region(bounds);
+
+                if (WindowState == FormWindowState.Maximized)
+                {
+                    region.Exclude(bounds);
+                }
+                else
+                {
+                    region.Exclude(clientRect);
+                }
+
+                using var brush = new SolidBrush(TransparentKeyColor);
+                graphics.FillRegion(brush, region);
+
+
+
+
+
+            }
+        }
+        finally
+        {
+            ReleaseDC(m.HWnd, dc);
+        }
+
+        m.Result = IntPtr.Zero;
 
         return true;
+
     }
+
 
 
 }

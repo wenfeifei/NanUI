@@ -1,4 +1,6 @@
 using NetDimension.NanUI.Browser.MessagePipe;
+using NetDimension.NanUI.JavaScript.Renderer;
+
 using Xilium.CefGlue;
 
 namespace NetDimension.NanUI.JavaScript.JavaScriptExecution;
@@ -21,14 +23,21 @@ class InvokeJavaScriptFunctionOnBrowserSide : MessageHandlerOnBrowserSide
     {
         if (request.Name == InvokeJavaScriptFunctionHandler.INVOKE_RENDER_SIDE_FUNCTION)
         {
-            dynamic requestData = JsonConvert.DeserializeObject<dynamic>(request.Data);
+            var requestData = JsonSerializer.Deserialize<BrowserSideFunctionMessageParameter>(request.Data);
 
-            Guid funcId = requestData.Uuid;
-            string data = requestData.Arguments;
+            var funcId = requestData.Uuid;
+            var data = requestData.Arguments;
 
             var args = JavaScriptValue.FromJson(data).ToArray();
 
             var func = JavaScriptSyncFunction.Bag.FirstOrDefault(x => x.Uuid == funcId);
+
+            if(args.Frame == null)
+            {
+
+                var frame = Owner.GetFrame(request.FrameId);
+                args.BindToFrame(frame, false);
+            }
 
 
             MessageResponse response;
@@ -70,12 +79,19 @@ class InvokeJavaScriptFunctionOnBrowserSide : MessageHandlerOnBrowserSide
     {
         if (request.Name == InvokeJavaScriptFunctionHandler.INVOKE_RENDER_SIDE_PROMISE_FUNCTION)
         {
-            dynamic requestData = JsonConvert.DeserializeObject<dynamic>(request.Data);
+            var requestData = JsonSerializer.Deserialize<BrowserSideFunctionMessageParameter>(request.Data);
 
-            Guid funcId = requestData.Uuid;
-            string data = requestData.Arguments;
+            var funcId = requestData.Uuid;
+            var data = requestData.Arguments;
 
             var args = JavaScriptValue.FromJson(data).ToArray();
+
+            if (args.Frame == null)
+            {
+
+                var frame = Owner.GetFrame(request.FrameId);
+                args.BindToFrame(frame, false);
+            }
 
 
             MessageResponse response;

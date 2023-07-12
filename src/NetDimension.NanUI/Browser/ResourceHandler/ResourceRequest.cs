@@ -1,6 +1,7 @@
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Serialization;
 using System.Collections.Specialized;
+using System.Text.Encodings.Web;
+using System.Text.Json.Serialization;
+
 using Xilium.CefGlue;
 
 namespace NetDimension.NanUI.Browser.ResourceHandler;
@@ -85,7 +86,7 @@ public sealed class ResourceRequest
 
     public NameValueCollection QueryString { get; } = null;
     public NameValueCollection FormData { get; } = null;
-    public JToken JsonData { get; } = null;
+    public string JsonData { get; } = null;
 
     public bool IsJson
     {
@@ -138,19 +139,13 @@ public sealed class ResourceRequest
         }
     }
 
-    //private JsonSerializerOptions _jsonSerializerOptions = new JsonSerializerOptions
-    //{
-    //    PropertyNameCaseInsensitive = true,
-    //    DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
-    //    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    //};
-
-    private readonly JsonSerializerSettings _jsonSerializerOptions = new()
+    private readonly JsonSerializerOptions _jsonSerializerOptions = new JsonSerializerOptions
     {
-        Formatting = Formatting.None,
-
-        ContractResolver = new CamelCasePropertyNamesContractResolver()
-
+        PropertyNameCaseInsensitive = true,
+        DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        ReferenceHandler = ReferenceHandler.IgnoreCycles,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
 
     };
 
@@ -161,7 +156,7 @@ public sealed class ResourceRequest
         {
             try
             {
-                return JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(RawData), _jsonSerializerOptions);
+                return JsonSerializer.Deserialize<T>(Encoding.UTF8.GetString(RawData), _jsonSerializerOptions);
 
             }
             catch
@@ -211,7 +206,7 @@ public sealed class ResourceRequest
         {
             try
             {
-                JsonData = JsonConvert.SerializeObject(Encoding.UTF8.GetString(RawData));
+                JsonData = JsonSerializer.Serialize(Encoding.UTF8.GetString(RawData));
             }
             catch
             {

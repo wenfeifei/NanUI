@@ -1,6 +1,11 @@
 namespace NetDimension.NanUI;
 
+using System;
+using System.Runtime.InteropServices;
+
 using NetDimension.NanUI.HostWindow;
+
+using Vanara.Extensions;
 using Vanara.PInvoke;
 using static Vanara.PInvoke.User32;
 
@@ -370,7 +375,7 @@ partial class Formium
 
 
     /// <summary>
-    /// You can disalbe About Menu in System Command Menu here, but you 
+    /// You can disalbe About Menu in System Command Menu here, but you
     /// must follow the LICENCE of NanUI Project at https://github.com/NetDimension/NanUI/blob/master/LICENCE
     /// </summary>
     protected virtual bool DisableAboutMenu => false;
@@ -417,6 +422,8 @@ partial class Formium
     public void Show()
     {
         FormHostWindow.Show();
+
+        FormHostWindow.Activate();
     }
 
     /// <summary>
@@ -425,6 +432,9 @@ partial class Formium
     public void Show(IWin32Window owner)
     {
         FormHostWindow.Show(owner);
+
+        FormHostWindow.Activate();
+
     }
 
     /// <summary>
@@ -433,6 +443,9 @@ partial class Formium
     public void Show(Formium owner)
     {
         FormHostWindow.Show(owner.FormHostWindow);
+
+        FormHostWindow.Activate();
+
     }
 
     /// <summary>
@@ -545,21 +558,28 @@ partial class Formium
     {
 
         Form innerWindow = null;
+        var defaultColor = _browserSettings.BackgroundColor;
 
         switch (WindowType)
         {
             case HostWindowType.System:
                 innerWindow = new StandardHostWindow(this);
+                innerWindow.BackColor = Color.FromArgb(0xff, defaultColor.R, defaultColor.G, defaultColor.B);
+
                 _currentHostWindowStyle = new SystemWindowStyle(innerWindow);
 
                 break;
             case HostWindowType.SystemBorderless:
                 innerWindow = new DwmFramelessHostWindow(this);
+                innerWindow.BackColor = Color.FromArgb(0xff, defaultColor.R, defaultColor.G, defaultColor.B);
+
                 _currentHostWindowStyle = new SystemBorderlessWindowStyle(innerWindow);
 
                 break;
             case HostWindowType.Borderless:
                 innerWindow = new FramelessHostWindow(this);
+                innerWindow.BackColor = Color.FromArgb(0xff, defaultColor.R, defaultColor.G, defaultColor.B);
+
                 _currentHostWindowStyle = new BorderlessWindowStyle(innerWindow);
 
                 break;
@@ -567,6 +587,8 @@ partial class Formium
                 Sizable = false;
                 AllowFullScreen = false;
                 innerWindow = new StandardHostWindow(this);
+                innerWindow.BackColor = Color.FromArgb(0xff, defaultColor.R, defaultColor.G, defaultColor.B);
+
                 _currentHostWindowStyle = new KioskWindowStyle(innerWindow);
                 innerWindow.FormBorderStyle = FormBorderStyle.None;
                 innerWindow.WindowState = FormWindowState.Maximized;
@@ -580,9 +602,6 @@ partial class Formium
                 Sizable = false;
                 innerWindow = new LayeredStyleHostWindow(this)
                 {
-                    ShadowEffect = ShadowEffect.None,
-                    CornerStyle = CornerStyle.None,
-                    FormBorderStyle = FormBorderStyle.FixedSingle
                 };
 
 
@@ -597,6 +616,11 @@ partial class Formium
             case HostWindowType.Custom:
                 break;
         }
+
+
+
+
+
 
 
 
@@ -638,7 +662,7 @@ partial class Formium
         FormHostWindow.Shown += FormHostWindowShown;
         FormHostWindow.VisibleChanged += FormHostWindowVisibleChanged;
         FormHostWindow.FormClosing += FormHostWindowFormClosing;
-        
+
 
         IFormHostWindow = (IFormiumHostWindow)FormHostWindow;
 
@@ -652,10 +676,12 @@ partial class Formium
     #region HostWindowEvents
     private void FormHostWindowMove(object sender, EventArgs e)
     {
+        OnMove();
     }
 
     private void FormHostWindowVisibleChanged(object sender, EventArgs e)
     {
+        OnVisibleChanged();
     }
 
     private void FormHostWindowShown(object sender, EventArgs e)
@@ -663,20 +689,31 @@ partial class Formium
     }
 
     bool _isResizing = false;
+
+    //Size? _sizeBeforeResizing =null;
+    //Size? _sizeAfterResizing =null;
+
     private void FormHostWindowResizeBegin(object sender, EventArgs e)
     {
         _isResizing = true;
+
+        //_sizeBeforeResizing =  new Size(Width, Height);
+
         WebView?.BrowserHost?.NotifyMoveOrResizeStarted();
     }
 
     private void FormHostWindowResizeEnd(object sender, EventArgs e)
     {
+        //_sizeAfterResizing = new Size(Width, Height);
+
         WebView?.BrowserHost?.WasResized();
+
         _isResizing = false;
     }
 
     private void FormHostWindowResize(object sender, EventArgs e)
     {
+        OnResize();
     }
 
     private void FormHostWindowHandleCreated(object sender, EventArgs e)
@@ -750,10 +787,46 @@ partial class Formium
 
         if (m.Msg == (int)WindowMessage.WM_SIZE)
         {
-            ResizeWebView();
+            var width = Macros.GET_X_LPARAM(m.LParam);
+            var height = Macros.GET_Y_LPARAM(m.LParam);
+            ResizeWebView(width,height);
         }
 
-        if(m.Msg == (int)WindowMessage.WM_ACTIVATEAPP)
+        //if(m.Msg == (int)WindowMessage.WM_NCCALCSIZE)
+        //{
+        //    var rcSize = (BorderlessWindow.NCCALCSIZE_PARAMS)Marshal.PtrToStructure(m.LParam, typeof(BorderlessWindow.NCCALCSIZE_PARAMS));
+
+        //    if((rcSize.lppos.flags & SetWindowPosFlags.SWP_NOSIZE)!= SetWindowPosFlags.SWP_NOSIZE)
+        //    {
+        //        ResizeWebView(rcSize.lppos.cx, rcSize.lppos.cy);
+
+        //    }
+
+        //}
+
+        //if (m.Msg == (int)WindowMessage.WM_WINDOWPOSCHANGED)
+        //{
+        //    var windowpos = Marshal.PtrToStructure<WINDOWPOS>(m.LParam);
+
+        //    if ((windowpos.flags & SetWindowPosFlags.SWP_NOSIZE) != SetWindowPosFlags.SWP_NOSIZE)
+        //    {
+        //        ResizeWebView();
+
+        //    }
+
+        //}
+        //if (m.Msg == (int)WindowMessage.WM_SIZING)
+        //{
+        //    var rect = m.LParam.ToStructure<RECT>();
+
+        //    InflateRect(ref rect, 1, 1);
+
+        //    ResizeWebView(rect.Width, rect.Height);
+        //}
+
+
+
+        if (m.Msg == (int)WindowMessage.WM_ACTIVATEAPP)
         {
             var isAppActivate = false;
 
@@ -925,7 +998,10 @@ if(typeof {JS_EVENT_RAISER_NAME} === 'undefined') return;
     {
         if (FormHostWindow != null)
         {
-            InvokeIfRequired(() => FormHostWindow.Text = GetWindowTitle());
+            InvokeIfRequired(() => {
+                var text = GetWindowTitle();
+                FormHostWindow.Text = text;
+            });
         }
     }
 
@@ -1011,6 +1087,45 @@ if(typeof {JS_EVENT_RAISER_NAME} === 'undefined') return;
     #endregion
 
 
+    #region HostWindow public events
+    /// <summary>
+    /// Occurs when size of window has changed.
+    /// </summary>
+    public event EventHandler<EventArgs> Resize;
 
+    internal protected void OnResize()
+    {
+
+        if (!IsIconic(HostWindowHandle))
+        {
+            GetClientRect(HostWindowHandle, out var rect);
+            ResizeWebView(rect.Width, rect.Height);
+        }
+
+
+
+
+        Resize?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Occurs when location of window has changed.
+    /// </summary>
+    public event EventHandler<EventArgs> Move;
+    internal protected void OnMove()
+    {
+        Move?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Occurs when visible state of window has changed.
+    /// </summary>
+    public event EventHandler<EventArgs> VisibleChanged;
+
+    internal protected void OnVisibleChanged()
+    {
+        VisibleChanged?.Invoke(this, EventArgs.Empty);
+    }
+    #endregion
 
 }

@@ -38,6 +38,9 @@ internal partial class BorderlessWindow : Form
 
     private CornerStyle _windowCornerStyle = CornerStyle.Normal;
 
+    internal Padding WindowNonclientAreaBorders { get; } = new Padding(1);
+
+
     #region Window Sizing
     private bool _shouldPerformMaximiazedState = false;
 
@@ -88,20 +91,29 @@ internal partial class BorderlessWindow : Form
         }
     }
 
+    protected override Size SizeFromClientSize(Size clientSize)
+    {
+
+        clientSize.Width += WindowNonclientAreaBorders.Horizontal;
+        clientSize.Height += WindowNonclientAreaBorders.Vertical;
+
+        return clientSize;
+    }
+
     private Size PatchWindowSizeInRestoreWindowBoundsIfNecessary(int width, int height)
     {
         if (WindowState == FormWindowState.Normal)
         {
             try
             {
-                var restoredWindowBoundsSpecified = typeof(Form).GetField("restoredWindowBoundsSpecified", BindingFlags.NonPublic | BindingFlags.Instance);
+                var restoredWindowBoundsSpecified = typeof(Form).GetField("restoredWindowBoundsSpecified", BindingFlags.NonPublic | BindingFlags.Instance) ?? typeof(Form).GetField("_restoredWindowBoundsSpecified", BindingFlags.NonPublic | BindingFlags.Instance);
                 var restoredSpecified = (BoundsSpecified)restoredWindowBoundsSpecified.GetValue(this);
 
                 if ((restoredSpecified & BoundsSpecified.Size) != BoundsSpecified.None)
                 {
                     var formStateExWindowBoundsFieldInfo = typeof(Form).GetField("FormStateExWindowBoundsWidthIsClientSize", BindingFlags.NonPublic | BindingFlags.Static);
-                    var formStateExFieldInfo = typeof(Form).GetField("formStateEx", BindingFlags.NonPublic | BindingFlags.Instance);
-                    var restoredBoundsFieldInfo = typeof(Form).GetField("restoredWindowBounds", BindingFlags.NonPublic | BindingFlags.Instance);
+                    var formStateExFieldInfo = typeof(Form).GetField("formStateEx", BindingFlags.NonPublic | BindingFlags.Instance) ?? typeof(Form).GetField("_formStateEx", BindingFlags.NonPublic | BindingFlags.Instance);
+                    var restoredBoundsFieldInfo = typeof(Form).GetField("restoredWindowBounds", BindingFlags.NonPublic | BindingFlags.Instance) ?? typeof(Form).GetField("_restoredWindowBounds", BindingFlags.NonPublic | BindingFlags.Instance) ;
 
                     if (formStateExWindowBoundsFieldInfo != null && formStateExFieldInfo != null && restoredBoundsFieldInfo != null)
                     {
@@ -110,8 +122,8 @@ internal partial class BorderlessWindow : Form
                         var vector = (BitVector32)formStateExFieldInfo.GetValue(this);
                         if (vector[section] == 1)
                         {
-                            width = restoredWindowBounds.Width;
-                            height = restoredWindowBounds.Height;
+                            width = restoredWindowBounds.Width + WindowNonclientAreaBorders.Horizontal;
+                            height = restoredWindowBounds.Height + WindowNonclientAreaBorders.Vertical;
                         }
                     }
                 }
@@ -130,12 +142,12 @@ internal partial class BorderlessWindow : Form
         _clientHeightField = typeof(Control).GetField("_clientHeight", BindingFlags.NonPublic | BindingFlags.Instance) ?? typeof(Control).GetField("clientHeight", BindingFlags.NonPublic | BindingFlags.Instance);
 
         _formStateSetClientSizeField = typeof(Form).GetField("FormStateSetClientSize", BindingFlags.NonPublic | BindingFlags.Static);
-        _formStateField = typeof(Form).GetField("formState", BindingFlags.NonPublic | BindingFlags.Instance);
+        _formStateField = typeof(Form).GetField("formState", BindingFlags.NonPublic | BindingFlags.Instance) ?? typeof(Form).GetField("_formState", BindingFlags.NonPublic | BindingFlags.Instance);
     }
 
     internal void SendFrameChangedMessage()
     {
-        SetWindowPos(hWnd, HWND.NULL, 0, 0, 0, 0, SetWindowPosFlags.SWP_FRAMECHANGED | SetWindowPosFlags.SWP_NOACTIVATE | SetWindowPosFlags.SWP_NOCOPYBITS | SetWindowPosFlags.SWP_NOMOVE | SetWindowPosFlags.SWP_NOOWNERZORDER | SetWindowPosFlags.SWP_NOREPOSITION | SetWindowPosFlags.SWP_NOSIZE | SetWindowPosFlags.SWP_NOZORDER);
+        SetWindowPos(hWnd, HWND.NULL, 0, 0, 0, 0, SetWindowPosFlags.SWP_FRAMECHANGED | SetWindowPosFlags.SWP_NOACTIVATE |/* SetWindowPosFlags.SWP_NOCOPYBITS | */SetWindowPosFlags.SWP_NOMOVE | SetWindowPosFlags.SWP_NOOWNERZORDER | SetWindowPosFlags.SWP_NOREPOSITION | SetWindowPosFlags.SWP_NOSIZE | SetWindowPosFlags.SWP_NOZORDER);
     }
 
 
@@ -237,6 +249,8 @@ internal partial class BorderlessWindow : Form
         Region = new Region(pathRegion);
 
         oldRegion?.Dispose();
+
+
     }
 
     internal void SetWindowRegion(Rectangle rectangleRegion)
@@ -295,6 +309,8 @@ internal partial class BorderlessWindow : Form
         var oldDeviceDpi = _deviceDpi;
         var newDeviceDpi = Macros.SignedHIWORD(m.WParam);
         var suggestedRect = Marshal.PtrToStructure<RECT>(m.LParam);
+
+        if (hWnd.IsNull) return false;
 
         ScaleFactor = DpiHelper.GetScaleFactorForWindow(hWnd);
 

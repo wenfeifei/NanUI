@@ -1,4 +1,5 @@
-﻿using Vanara.PInvoke;
+using Vanara.PInvoke;
+
 using Xilium.CefGlue;
 
 namespace NetDimension.NanUI.HostWindow;
@@ -23,7 +24,7 @@ internal class ImeHandler
     List<CefRectangle> compositionBounds = new List<CefRectangle>();
 
 
-    internal HWND hWnd => new HWND(Owner.HostWindowHandle);
+    internal HWND hWnd { get; set; }
     internal IntPtr Handle => hWnd.DangerousGetHandle();
 
     internal Formium Owner { get; }
@@ -57,11 +58,10 @@ internal class ImeHandler
                 if (CreateCaret(hWnd, HBITMAP.NULL, 1, 3))
                 {
                     systemCaret = true;
+
                 }
             }
         }
-
-
     }
 
     internal void DestroyImeWindow()
@@ -129,7 +129,7 @@ internal class ImeHandler
 
             ImeNative.ImmGetCompositionString(imc, ImeNative.GCS_COMPCLAUSE, clauseData, clauseSize);
 
-            for (int i = 0; i < clauseLength - 1; i++)
+            for (var i = 0; i < clauseLength - 1; i++)
             {
                 var from = BitConverter.ToInt32(clauseData, i * sizeof(int));
                 var to = BitConverter.ToInt32(clauseData, (i + 1) * sizeof(int));
@@ -154,6 +154,7 @@ internal class ImeHandler
 
     }
 
+
     internal void MoveImeWindow()
     {
         if (GetFocus() != hWnd)
@@ -165,7 +166,6 @@ internal class ImeHandler
         {
             return;
         }
-
 
         CefRectangle rc;
 
@@ -192,29 +192,21 @@ internal class ImeHandler
 
         var imc = ImeNative.ImmGetContext(Handle);
 
+
+        var x = rc.X + rc.Width;
+        var y = rc.Y + rc.Height;
+
         const int kCaretMargin = 1;
 
-        if (languageCodeId == ImeNative.LANG_CHINESE)
+        var candidatePosition = new ImeNative.CANDIDATEFORM
         {
-            // Chinese IMEs ignore function calls to ::ImmSetCandidateWindow()
-            // when a user disables TSF (Text Service Framework) and CUAS (Cicero
-            // Unaware Application Support).
-            // On the other hand, when a user enables TSF and CUAS, Chinese IMEs
-            // ignore the position of the current system caret and use the
-            // parameters given to ::ImmSetCandidateWindow() with its 'dwStyle'
-            // parameter CFS_CANDIDATEPOS.
-            // Therefore, we do not only call ::ImmSetCandidateWindow() but also
-            // set the positions of the temporary system caret if it exists.
+            dwIndex = 0,
+            dwStyle = (int)ImeNative.CFS_CANDIDATEPOS,
+            ptCurrentPos = new ImeNative.POINT(x, y),
+            rcArea = new ImeNative.RECT(0, 0, 0, 0)
+        };
 
-            var candidatePotision = new ImeNative.CANDIDATEFORM
-            {
-                dwStyle = (int)ImeNative.CFS_CANDIDATEPOS,
-                ptCurrentPos = new ImeNative.POINT(rc.X, rc.Y),
-                rcArea = new ImeNative.RECT(0, 0, 0, 0)
-            };
-
-            ImeNative.ImmSetCandidateWindow(imc, ref candidatePotision);
-        }
+        ImeNative.ImmSetCandidateWindow(imc, ref candidatePosition);
 
 
         if (systemCaret)
@@ -229,6 +221,30 @@ internal class ImeHandler
             }
         }
 
+        if (languageCodeId == ImeNative.LANG_CHINESE)
+        {
+            // Chinese IMEs ignore function calls to ::ImmSetCandidateWindow()
+            // when a user disables TSF (Text Service Framework) and CUAS (Cicero
+            // Unaware Application Support).
+            // On the other hand, when a user enables TSF and CUAS, Chinese IMEs
+            // ignore the position of the current system caret and use the
+            // parameters given to ::ImmSetCandidateWindow() with its 'dwStyle'
+            // parameter CFS_CANDIDATEPOS.
+            // Therefore, we do not only call ::ImmSetCandidateWindow() but also
+            // set the positions of the temporary system caret if it exists.
+
+            var candidatePotision = new ImeNative.COMPOSITIONFORM
+            {
+                dwStyle = (int)ImeNative.CFS_CANDIDATEPOS,
+                ptCurrentPos = new ImeNative.POINT(rc.X, rc.Y),
+                rcArea = new ImeNative.RECT(0, 0, 0, 0)
+            };
+
+            ImeNative.ImmSetCompositionWindow(imc, ref candidatePotision);
+        }
+
+
+
         if (languageCodeId == ImeNative.LANG_KOREAN)
         {
             // Korean IMEs require the lower-left corner of the caret to move their
@@ -239,6 +255,7 @@ internal class ImeHandler
         // Japanese IMEs and Korean IMEs also use the rectangle given to
         // ::ImmSetCandidateWindow() with its 'dwStyle' parameter CFS_EXCLUDE
         // Therefore, we also set this parameter here.
+
         var excludeRectangle = new ImeNative.CANDIDATEFORM
         {
             dwIndex = 0,
@@ -379,7 +396,6 @@ internal class ImeHandler
 
         var ret = GetString(imc, lparam, ImeNative.GCS_COMPSTR, out compositionText);
 
-
         if (ret)
         {
             underlines = GetCompositionInfo(imc, lparam, compositionText, out compostionStart);
@@ -405,27 +421,7 @@ internal class ImeHandler
         MoveImeWindow();
     }
 
-    internal void ChangeCompositionRange(CefRange selectRange, List<CefRectangle> bounds)
-    {
-        var scaleFactor = DpiHelper.GetScaleFactorForWindow(hWnd);
 
-        compositionRange = selectRange;
-
-        var rects = new List<CefRectangle>();
-
-        foreach (var rect in bounds)
-        {
-            rects.Add(new CefRectangle((int)(rect.X * scaleFactor), (int)(rect.Y * scaleFactor), (int)(rect.Width * scaleFactor), (int)(rect.Height * scaleFactor)));
-        }
-
-        compositionBounds = rects;
-
-        Owner.InvokeIfRequired(() =>
-        {
-            MoveImeWindow();
-        });
-
-    }
 
 
     #region IME Control
@@ -457,18 +453,40 @@ internal class ImeHandler
 
     #endregion
 
-    public void OnIMESetContext(WindowMessage message, IntPtr wParam, IntPtr lParam)
+    public void ChangeCompositionRange(CefRange selectRange, List<CefRectangle> bounds)
     {
+        var scaleFactor = DpiHelper.GetScaleFactorForWindow(hWnd);
 
-        var retval = (ulong)lParam;
+        compositionRange = selectRange;
+
+        var rects = new List<CefRectangle>();
+
+        foreach (var rect in bounds)
+        {
+            rects.Add(new CefRectangle((int)(rect.X * scaleFactor), (int)(rect.Y * scaleFactor), (int)(rect.Width * scaleFactor), (int)(rect.Height * scaleFactor)));
+        }
+
+        compositionBounds = rects;
+
+        MoveImeWindow();
+
+    }
+
+    public void OnIMESetContext(ref Message m)
+    {
+        hWnd = new HWND(m.HWnd);
+        var retval = (ulong)m.LParam;
 
         retval &= ~ImeNative.ISC_SHOWUICOMPOSITIONWINDOW;
 
-        lParam = (IntPtr)retval;
+        var lParam = (IntPtr)retval;
 
-        DefWindowProc(hWnd, (uint)message, wParam, lParam);
+        DefWindowProc(m.HWnd, (uint)m.Msg, m.WParam, lParam);
 
         CreateImeWindow();
+
+
+
         MoveImeWindow();
     }
 
@@ -486,35 +504,56 @@ internal class ImeHandler
         if (GetResult((uint)lParam, out var textStr))
         {
             browser.ImeCommitText(textStr, new CefRange(int.MaxValue, int.MaxValue), 0);
+
             browser.ImeSetComposition(textStr, 0, new CefCompositionUnderline(), new CefRange(int.MaxValue, int.MaxValue), new CefRange(0, 0));
+
             browser.ImeFinishComposingText(false);
 
             ResetComposition();
+
         }
         else
         {
             var underlines = new List<CefCompositionUnderline>();
+
             if (GetComposition((uint)lParam, out textStr, out var compostionStart, ref underlines))
             {
-                browser.ImeSetComposition(textStr, underlines.Count, underlines[0], new CefRange(int.MaxValue, int.MaxValue), new CefRange(compostionStart, compostionStart /*+ textStr.Length*/));
+
+                browser.ImeSetComposition(textStr, underlines.Count, underlines[0], new CefRange(int.MaxValue, int.MaxValue), new CefRange(compostionStart, compostionStart + textStr.Length));
 
                 UpdateCaretPosition(compostionStart - 1);
             }
             else
             {
-                OnImeCancelCompositionEvent();
+                browser.ImeSetComposition(string.Empty, 1, new CefCompositionUnderline { }, new CefRange(0, 1), new CefRange(0, 1));
+
+                OnImeCancelComposition();
             }
         }
+
+
+
+
+
     }
 
-    public void OnImeCancelCompositionEvent()
+    public void OnImeCancelComposition()
     {
         var browser = Owner.GetHost();
+
+        browser?.ImeSetComposition(string.Empty, 0, new CefCompositionUnderline(), new CefRange(int.MaxValue, int.MaxValue), new CefRange(0, 0));
+
+        browser?.ImeCommitText(string.Empty, new CefRange(int.MaxValue, int.MaxValue), 0);
+
+
 
         if (languageCodeId != ImeNative.LANG_KOREAN)
         {
             browser?.ImeFinishComposingText(false);
         }
+
+
+
 
         browser?.ImeCancelComposition();
         ResetComposition();

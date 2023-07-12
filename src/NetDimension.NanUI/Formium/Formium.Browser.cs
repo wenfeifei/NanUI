@@ -1,4 +1,7 @@
+using System;
+
 using NetDimension.NanUI.Browser;
+using NetDimension.NanUI.HostWindow;
 
 using Vanara.PInvoke;
 
@@ -30,15 +33,9 @@ partial class Formium
 
     internal void CreateBrowser()
     {
-        var browserSettings = OnCreateBrowserSettings();
 
 
-        if (browserSettings == null)
-        {
-            browserSettings = WinFormium.DefaultBrowserSettings;
-        }
-
-        WebView = new FormiumWebView(this, browserSettings, StartUrl);
+        WebView = new FormiumWebView(this, _browserSettings, StartUrl);
 
         WindowInfo = CefWindowInfo.Create();
 
@@ -92,6 +89,10 @@ partial class Formium
         ThreadPool.QueueUserWorkItem(AfterSetBrowserTasks);
 
         InvokeIfRequired(() => ResizeWebView());
+
+
+
+
     }
 
     private void AfterSetBrowserTasks(object state)
@@ -186,6 +187,23 @@ partial class Formium
         {
             AttachToChromeWidgetMessageHandler();
         }
+
+
+        ContextCreated?.Invoke(this, new ContextCreatedEventArgs(browser, frame));
+
+
+        if (WindowType == HostWindowType.Layered)
+        {
+            //var host = browser.GetHost();
+
+            //host.ImeCommitText(string.Empty, new CefRange(int.MaxValue, int.MaxValue), 0);
+            //host.ImeSetComposition(string.Empty, 0, new CefCompositionUnderline(), new CefRange(int.MaxValue, int.MaxValue), new CefRange(0, 0));
+            //host.ImeFinishComposingText(false);
+            //SendMessage(HostWindowHandle, WindowMessage.WM_IME_KEYDOWN, 0);
+        }
+
+
+
     }
 
     internal bool BrowserWmSetCursor(ref Message m)
@@ -342,10 +360,41 @@ partial class Formium
         }
         else
         {
-            
+
             if (IsWindowVisible(HostWindowHandle))
             {
                 SetWindowPos(BrowserWindowHandle, HWND.NULL, 0, 0, rect.Width, rect.Height, SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_SHOWWINDOW | SetWindowPosFlags.SWP_NOACTIVATE);
+
+                SetWindowLong(BrowserWindowHandle, WindowLongFlags.GWL_STYLE, (IntPtr)(WindowStyles.WS_CHILD | WindowStyles.WS_CLIPCHILDREN | WindowStyles.WS_CLIPSIBLINGS | WindowStyles.WS_TABSTOP | WindowStyles.WS_VISIBLE));
+            }
+            else
+            {
+                SetWindowPos(BrowserWindowHandle, HWND.NULL, 0, 0, 0, 0, SetWindowPosFlags.SWP_NOSIZE | SetWindowPosFlags.SWP_NOMOVE | SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_HIDEWINDOW);
+
+                SetWindowLong(BrowserWindowHandle, WindowLongFlags.GWL_STYLE, (IntPtr)(WindowStyles.WS_CHILD | WindowStyles.WS_CLIPCHILDREN | WindowStyles.WS_CLIPSIBLINGS | WindowStyles.WS_TABSTOP | WindowStyles.WS_DISABLED));
+            }
+        }
+
+    }
+
+
+    internal void ResizeWebView(int width,int height)
+    {
+        if (!_isHostWindowCreated || !_isBrowserCreated || BrowserWindowHandle == IntPtr.Zero)
+            return;
+
+        //GetClientRect(HostWindowHandle, out var rect);
+
+        if (IsIconic(this.HostWindowHandle))
+        {
+            SetWindowPos(BrowserWindowHandle, HWND.NULL, 0, 0, 0, 0, SetWindowPosFlags.SWP_NOSIZE | SetWindowPosFlags.SWP_NOMOVE | SetWindowPosFlags.SWP_NOZORDER);
+        }
+        else
+        {
+
+            if (IsWindowVisible(HostWindowHandle))
+            {
+                SetWindowPos(BrowserWindowHandle, HWND.NULL, 0, 0, width, height, SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_SHOWWINDOW | SetWindowPosFlags.SWP_NOACTIVATE);
 
                 SetWindowLong(BrowserWindowHandle, WindowLongFlags.GWL_STYLE, (IntPtr)(WindowStyles.WS_CHILD | WindowStyles.WS_CLIPCHILDREN | WindowStyles.WS_CLIPSIBLINGS | WindowStyles.WS_TABSTOP | WindowStyles.WS_VISIBLE));
             }
@@ -389,7 +438,7 @@ partial class Formium
         }
         else
         {
-            var json = JsonConvert.SerializeObject(data);
+            var json = JsonSerializer.Serialize(data);
             var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
 
             ExecuteJavaScript($"Formium.__onDataMessageReceived__(`{message}`,`{base64}`)");
@@ -523,7 +572,7 @@ partial class Formium
     }
 
     /// <summary>
-    /// Load page from the 
+    /// Load page from the
     /// </summary>
     /// <param name="url"></param>
     public void LoadUrl(string url)
@@ -617,6 +666,8 @@ partial class Formium
     /// Occurs when Formium is ready to use.
     /// </summary>
     //public event EventHandler Ready;
+
+    internal protected event EventHandler<ContextCreatedEventArgs> ContextCreated;
 
     /// <summary>
     /// Occurs when DataMessage from Browser has arrived.
@@ -1131,4 +1182,15 @@ partial class Formium
     #endregion
 
     #endregion
+}
+
+public class ContextCreatedEventArgs : EventArgs
+{
+    internal ContextCreatedEventArgs(CefBrowser browser, CefFrame frame)
+    {
+        this.Browser = browser;
+        this.Frame = frame;
+    }
+    public CefBrowser Browser { get; }
+    public CefFrame Frame { get; }
 }

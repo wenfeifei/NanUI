@@ -210,6 +210,12 @@ internal sealed class WinFormiumRenderHandlerUsingDeviceContext : CefRenderHandl
         }
     }
 
+    protected override void OnTextSelectionChanged(CefBrowser browser, string selectedText, CefRange selectedRange)
+    {
+        base.OnTextSelectionChanged(browser, selectedText, selectedRange);
+    }
+
+
 
     protected override void OnPopupShow(CefBrowser browser, bool show)
     {
@@ -259,7 +265,7 @@ internal sealed class WinFormiumRenderHandlerUsingDeviceContext : CefRenderHandl
         if (type == CefPaintElementType.View)
         {
 
-            var bmp = _renderTarget.CreateBitmap(new SizeI(width, height), buffer, width * 4, new BitmapProperties(new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied)));
+            var bmp = _renderTarget.CreateBitmap(new Size(width, height), buffer, width * 4, new BitmapProperties(new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied)));
 
             if (!_isPopupShown)
             {
@@ -272,7 +278,7 @@ internal sealed class WinFormiumRenderHandlerUsingDeviceContext : CefRenderHandl
         }
         else if (type == CefPaintElementType.Popup)
         {
-            var bmp = _renderTarget.CreateBitmap(new SizeI(width, height), buffer, width * 4, new BitmapProperties(new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied)));
+            var bmp = _renderTarget.CreateBitmap(new Size(width, height), buffer, width * 4, new BitmapProperties(new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied)));
 
             if (_cachedPopupImage != null)
             {
@@ -345,10 +351,6 @@ internal sealed class WinFormiumRenderHandlerUsingDeviceContext : CefRenderHandl
 
     }
 
-    protected override void OnTextSelectionChanged(CefBrowser browser, string selectedText, CefRange selectedRange)
-    {
-        base.OnTextSelectionChanged(browser, selectedText, selectedRange);
-    }
 
 
 }

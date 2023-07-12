@@ -1,12 +1,16 @@
+using System.Diagnostics;
+
 using Xilium.CefGlue;
 using static Vanara.PInvoke.User32;
 
 namespace NetDimension.NanUI.HostWindow;
 
-internal class LayeredStyleHostWindow : BorderlessWindow, IFormiumHostWindow
+internal class LayeredStyleHostWindow : LayeredWindow, IFormiumHostWindow
 {
-    const int WS_EX_LAYERED = 0x00080000;
+
+
     private ImeHandler imeHandler;
+
 
     public WindowMessageDelegate OnWindowsMessage { get; set; }
 
@@ -16,22 +20,52 @@ internal class LayeredStyleHostWindow : BorderlessWindow, IFormiumHostWindow
 
     private CefBrowserHost BrowserHost => Formium?.Browser?.GetHost();
 
-    protected override CreateParams CreateParams
-    {
-        get
-        {
-            CreateParams createParams = base.CreateParams;
-            createParams.ExStyle |= WS_EX_LAYERED;
-            return createParams;
-        }
-    }
+
     public LayeredStyleHostWindow(Formium formium)
     {
         Formium = formium;
 
-        imeHandler = new ImeHandler(formium);
+        imeHandler = new ImeHandler(Formium);
+
+
+        //Formium.ContextCreated += ContextCreated;
+
+        formium.LoadStart += Formium_LoadStart;
     }
 
+    private void Formium_LoadStart(object sender, Browser.LoadStartEventArgs e)
+    {
+        imeHandler.OnImeCancelComposition();
+
+        var host = e.Frame.Browser.GetHost();
+
+
+        host.ImeSetComposition(string.Empty, 0, new CefCompositionUnderline(), new CefRange(int.MaxValue, int.MaxValue), new CefRange(0, 0));
+
+        host.ImeCommitText(string.Empty, new CefRange(int.MaxValue, int.MaxValue), 0);
+
+        host.ImeFinishComposingText(false);
+
+        SendMessage(Formium.HostWindowHandle, WindowMessage.WM_IME_KEYDOWN, 0);
+    }
+
+    private void Formium_BeforeBrowse(object sender, Browser.BeforeBrowseEventArgs e)
+    {
+
+    }
+
+    private void ContextCreated(object sender, ContextCreatedEventArgs e)
+    {
+
+        imeHandler.OnImeCancelComposition();
+
+        var host = e.Frame.Browser.GetHost();
+
+        host.ImeCommitText(string.Empty, new CefRange(int.MaxValue, int.MaxValue), 0);
+        host.ImeSetComposition(string.Empty, 0, new CefCompositionUnderline(), new CefRange(int.MaxValue, int.MaxValue), new CefRange(0, 0));
+        host.ImeFinishComposingText(false);
+        SendMessage(Formium.HostWindowHandle, WindowMessage.WM_IME_KEYDOWN, 0);
+    }
 
     protected override bool CanEnableIme => true;
 
@@ -40,9 +74,13 @@ internal class LayeredStyleHostWindow : BorderlessWindow, IFormiumHostWindow
     {
         base.OnHandleCreated(e);
 
-        imeHandler.EnableIME();
-
         SystemDpiChanged += SystemDpiChangedHandler;
+
+        ImeMode = ImeMode.Disable;
+
+        //
+
+
     }
 
     private void SystemDpiChangedHandler(object sender, WindowDpiChangedEventArgs e)
@@ -81,24 +119,27 @@ internal class LayeredStyleHostWindow : BorderlessWindow, IFormiumHostWindow
                 break;
             case WindowMessage.WM_IME_SETCONTEXT:
                 {
-                    imeHandler.OnIMESetContext(msg, m.WParam, m.LParam);
+                    imeHandler?.OnIMESetContext(ref m);
+
                 }
                 return;
             case WindowMessage.WM_IME_STARTCOMPOSITION:
                 {
-                    imeHandler.OnImeStartComposition();
+                    imeHandler?.OnImeStartComposition();
                 }
                 return;
             case WindowMessage.WM_IME_COMPOSITION:
                 {
-                    imeHandler.OnImeComposition(msg, m.WParam, m.LParam);
+                    imeHandler?.OnImeComposition(msg, m.WParam, m.LParam);
                 }
                 return;
             case WindowMessage.WM_IME_ENDCOMPOSITION:
                 {
-                    imeHandler.OnImeCancelCompositionEvent();
+                    imeHandler?.OnImeCancelComposition();
+                    base.WndProc(ref m);
+
                 }
-                break;
+                return;
 
         }
 
@@ -162,50 +203,55 @@ internal class LayeredStyleHostWindow : BorderlessWindow, IFormiumHostWindow
         return result;
     }
 
+    bool _isOnEditableField = false;
+    internal void OnEditableField(bool v)
+    {
+        _isOnEditableField = v;
+
+        if (v == true)
+        {
+            ImeMode = ImeMode.OnHalf;
+        }
+        else
+        {
+            ImeMode = ImeMode.Disable;
+        }
+    }
+
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
-
-        e.Handled = true;
-
-        //base.OnKeyDown(e);
-
-
         BrowserHost?.SendKeyEvent(new CefKeyEvent
         {
-            EventType = CefKeyEventType.KeyDown,
+            EventType = CefKeyEventType.RawKeyDown,
             WindowsKeyCode = (int)e.KeyCode,
+            NativeKeyCode = (int)e.KeyValue,
             Modifiers = GetKeyboardModifiers(e.Modifiers),
+            FocusOnEditableField = _isOnEditableField,
         });
-
-
-
+        base.OnKeyDown(e);
 
     }
 
     protected override void OnKeyUp(KeyEventArgs e)
     {
-        e.Handled = true;
-
-
-        //base.OnKeyUp(e);
-
-
         BrowserHost?.SendKeyEvent(new CefKeyEvent
         {
             EventType = CefKeyEventType.KeyUp,
             WindowsKeyCode = (int)e.KeyCode,
-            Modifiers = GetKeyboardModifiers(e.Modifiers)
+            NativeKeyCode = (int)e.KeyValue,
+            Modifiers = GetKeyboardModifiers(e.Modifiers),
+            FocusOnEditableField = !_isOnEditableField,
         });
 
-
+        base.OnKeyUp(e);
     }
 
 
 
     protected override void OnKeyPress(KeyPressEventArgs e)
     {
-        //base.OnKeyPress(e);
-
+        e.Handled = true;
 
         BrowserHost?.SendKeyEvent(new CefKeyEvent
         {
@@ -213,7 +259,11 @@ internal class LayeredStyleHostWindow : BorderlessWindow, IFormiumHostWindow
             WindowsKeyCode = e.KeyChar,
             Character = e.KeyChar,
             UnmodifiedCharacter = e.KeyChar,
+            FocusOnEditableField = _isOnEditableField,
         });
+
+        base.OnKeyPress(e);
+
 
     }
 
@@ -224,13 +274,12 @@ internal class LayeredStyleHostWindow : BorderlessWindow, IFormiumHostWindow
         GetPointInCurrentView(ref pt);
 
         BrowserHost?.SendMouseMoveEvent(new CefMouseEvent(pt.X, pt.Y, GetMouseModifiers(e.Button)), false);
+
     }
 
     internal void ChangeCompositionRange(CefRange selectedRange, CefRectangle[] characterBounds)
     {
-        if (imeHandler == null) return;
-
-        imeHandler.ChangeCompositionRange(selectedRange, new List<CefRectangle>(characterBounds));
+        imeHandler?.ChangeCompositionRange(selectedRange, new List<CefRectangle>(characterBounds));
     }
 
     protected override void OnMouseLeave(EventArgs e)
@@ -241,6 +290,7 @@ internal class LayeredStyleHostWindow : BorderlessWindow, IFormiumHostWindow
     protected override void OnMouseDown(MouseEventArgs e)
     {
         var pt = e.Location;
+
 
         GetPointInCurrentView(ref pt);
 
@@ -264,13 +314,12 @@ internal class LayeredStyleHostWindow : BorderlessWindow, IFormiumHostWindow
             BrowserHost?.SendMouseClickEvent(new CefMouseEvent(pt.X, pt.Y, GetMouseModifiers(e.Button)), buttonType.Value, false, e.Clicks);
             BrowserHost?.SendFocusEvent(true);
         }
-
-
     }
 
     protected override void OnMouseUp(MouseEventArgs e)
     {
         var pt = e.Location;
+
 
         GetPointInCurrentView(ref pt);
 
@@ -304,7 +353,7 @@ internal class LayeredStyleHostWindow : BorderlessWindow, IFormiumHostWindow
 
     protected override void OnMouseWheel(MouseEventArgs e)
     {
-        var pt = PointToClient(e.Location);
+        var pt = e.Location;
 
         GetPointInCurrentView(ref pt);
 
@@ -320,6 +369,7 @@ internal class LayeredStyleHostWindow : BorderlessWindow, IFormiumHostWindow
     {
         BrowserHost?.SendFocusEvent(true);
     }
+
 
 
     #endregion
