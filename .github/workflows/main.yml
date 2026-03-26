@@ -1,29 +1,33 @@
 name: NanUI CI/CD Pipeline
 
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
 
 jobs:
   ci:
-    runs-on: windows-2022
+    runs-on: windows-latest
     steps:
       # Install the .NET Core workload
       - name: Install .NET Core
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "7.0.x"
-          
+          dotnet-version: "10.0.x"
+
       - name: Get .NET information
         run: dotnet --info
-        
+
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v1.1
+        uses: microsoft/setup-msbuild@v2
         with:
-          vs-version: '[17.0,18.0)'
+          vs-version: "[17.0,18.0)"
           vs-prerelease: true
 
       - name: Checkout repository
         id: checkout_repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -31,19 +35,30 @@ jobs:
         id: clean_dotnet_cache
         shell: pwsh
         run: |
-          dotnet clean .\NetDimension.NanUI.sln
+          dotnet clean .\"NanUI.sln"
           dotnet nuget locals all --clear
 
       - name: Install NuGet packages
         id: install_nuget_packages
         shell: pwsh
         run: |
-          nuget restore .\NetDimension.NanUI.sln
+          nuget restore .\"NanUI.sln"
 
       - name: Build solution
         id: build_solution
         shell: pwsh
         run: |
-          msbuild .\NetDimension.NanUI.sln
+          msbuild .\"NanUI.sln" -property:Configuration=Release
+
+      - name: Install Nuget
+        run: |
+          $sourceNugetExe = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
+          $targetNugetExe = "nuget.exe"
+          Invoke-WebRequest $sourceNugetExe -OutFile $targetNugetExe
+
+      - name: Push Nuget package
+        run: |
+          .\nuget.exe push .\bin\NetDimension.NanUI.*.nupkg -Source https://api.nuget.org/v3/index.json -ApiKey ${{ secrets.NUGET_KEY }} -NoSymbols -SkipDuplicate
+          .\nuget.exe push .\bin\NetDimension.NanUI.*.snupkg -Source https://api.nuget.org/v3/index.json -ApiKey ${{ secrets.NUGET_KEY }} -SkipDuplicate
 
 # Built with ❤ by [Pipeline Foundation](https://pipeline.foundation)
